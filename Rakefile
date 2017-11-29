@@ -159,6 +159,8 @@ end
 namespace :rds do
   dst_dir = File.join($wrk_dir, 'rds', $database_name)
   db_info = File.join(dst_dir, 'db_info.json')
+  my_cnf = File.join(dst_dir, 'my.cnf')
+  envs = File.join(dst_dir, 'envs.yml')
 
   directory dst_dir
 
@@ -180,6 +182,61 @@ namespace :rds do
     with_file db_info, delete_on_fail: true do
       res = aws ['rds', 'describe-db-instances',
                  '--db-instance-identifier', $database_name].join(' ')
+    end
+  end
+
+  file my_cnf => [db_info] do
+    info = JSON.load File.open(db_info)
+    host = info['DBInstances'][0]['Endpoint']['Address']
+    port = info['DBInstances'][0]['Endpoint']['Port']
+    user = env['AWS_RDS_MASTER_USERNAME']
+    password = env['AWS_RDS_MASTER_USER_PASSWORD']
+    with_file my_cnf do
+      ['[client]',
+       "host=#{host}",
+       "port=#{port}",
+       "user=#{user}",
+       "password=#{password}",
+       ''
+      ].join("\n")
+    end
+  end
+
+  desc 'Start DB console'
+  task :cli => [my_cnf] do
+    exec 'mysql', "--defaults-extra-file=#{my_cnf}"
+  end
+
+  desc 'Create user on DB'
+  task :create_user => [my_cnf] do
+    cmd = ['mysql',
+           "--defaults-extra-file=#{my_cnf}",
+           '-e',
+           %("CREATE USER 'lambda'@'%' IDENTIFIED WITH AWSAuthenticationPlugin as 'RDS';")
+          ].join(' ')
+    res = `#{cmd}`
+    puts res
+    cmd = ['mysql',
+           "--defaults-extra-file=#{my_cnf}",
+           '-e',
+           %("GRANT SELECT ON *.* to 'lambda'@'%' REQUIRE SSL;")
+          ].join(' ')
+    res = `#{cmd}`
+    puts res
+  end
+
+  desc 'Create envs setting for deploy'
+  task :prepare => [db_info] do
+    info = JSON.load File.open(db_info)
+    host = info['DBInstances'][0]['Endpoint']['Address']
+    port = info['DBInstances'][0]['Endpoint']['Port']
+    dbi_resource_id = info['DBInstances'][0]['DbiResourceId']
+    with_file envs do
+      {
+        'HOST' => host,
+        'PORT' => port,
+        'DBI_RESOURCE_ID' => dbi_resource_id
+      }.to_yaml
     end
   end
 end
