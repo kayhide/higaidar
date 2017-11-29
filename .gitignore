@@ -1,3 +1,11 @@
+tmp/*
+!tmp/.keep
+
+.env.*.yml
+!.env.test.yml
+
+.rake
+
 # package directories
 node_modules
 jspm_packages
