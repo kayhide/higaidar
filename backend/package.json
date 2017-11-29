@@ -1,0 +1,19 @@
+{
+  "private": true,
+  "dependencies": {
+    "aws-sdk": "^2.158.0",
+    "co": "^4.6.0",
+    "mysql2": "^1.5.1",
+    "sequelize": "^4.23.2",
+    "util.promisify": "^1.0.0"
+  },
+  "devDependencies": {
+    "lodash": "^4.17.4",
+    "proxyquire": "^1.8.0",
+    "serverless": "^1.24.1"
+  },
+  "scripts": {
+    "repl": "NODE_PATH=. node lib/repl.js",
+    "deploy": "rake rds:prepare && serverless deploy -v"
+  }
+}
