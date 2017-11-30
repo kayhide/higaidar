@@ -3,12 +3,9 @@
 const os = require('os');
 const fs = require('fs');
 const path = require('path');
+const yaml = require('js-yaml');
 const co = require('co');
 
-
-if (!process.env.ON_REMOTE) {
-  console.log('using localstack...');
-}
 
 const repl = require('repl').start({ useGlobal: true });
 
@@ -49,14 +46,15 @@ function load() {
   if (process.env.ON_REMOTE) {
   }
   else {
-    const Localstack = require('lib/localstack');
-    const proxyquire = require('proxyquire');
-    const stub = {
-      'aws-sdk': {
-        DynamoDB: Localstack.DynamoDB,
-        S3: Localstack.S3,
-        '@global': true
-      }
-    }
+    const db_config = yaml.safeLoad(fs.readFileSync(path.join(__dirname, '../../db/config.yml')));
+    const c = db_config[process.env.STAGE];
+
+    const Sequelize = require('sequelize');
+    const sequelize = new Sequelize(c.database, c.username, c.password, {
+      host: 'localhost',
+      dialect: { mysql2: 'mysql' }[c.adapter] || c.adapter
+    })
+
+    repl.context.User = require('app/model/user').define(sequelize);
   }
 };

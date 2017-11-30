@@ -14,6 +14,7 @@ function readConfig() {
 function injectEnv(config) {
   Object.assign(process.env, config.provider.environment);
   Object.assign(process.env, {
+    STAGE: config.provider.stage,
     AWS_REGION: config.provider.region,
     AWS_PROFILE: config.provider.profile
   });
