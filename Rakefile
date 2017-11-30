@@ -160,7 +160,7 @@ namespace :rds do
   dst_dir = File.join($wrk_dir, 'rds', $database_name)
   db_info = File.join(dst_dir, 'db_info.json')
   my_cnf = File.join(dst_dir, 'my.cnf')
-  envs = File.join(dst_dir, 'envs.yml')
+  vars = File.join(dst_dir, 'vars.yml')
 
   directory dst_dir
 
@@ -178,7 +178,7 @@ namespace :rds do
          '--publicly-accessible'].join(' ')
   end
 
-  task :pull => [dst_dir, db_info, my_cnf, envs]
+  task :pull => [dst_dir, db_info, my_cnf, vars]
 
   file db_info do
     with_file db_info, delete_on_fail: true do
@@ -204,9 +204,9 @@ namespace :rds do
     end
   end
 
-  file envs => [db_info] do
+  file vars => [db_info] do
     info = JSON.load File.open(db_info)
-    with_file envs do
+    with_file vars do
       {
         HOST: info['DBInstances'][0]['Endpoint']['Address'],
         PORT: info['DBInstances'][0]['Endpoint']['Port'],

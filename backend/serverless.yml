@@ -20,8 +20,8 @@ provider:
     AWS_RDS_DATABASE: ${self:custom.rds.DATABASE}
 
 custom:
-  envs: ${file(../.env.${self:provider.stage}.yml)}
-  rds: ${file(../.rake/rds/${self:service}-${self:provider.stage}/envs.yml)}
+  env: ${file(../.env.${self:provider.stage}.yml)}
+  rds: ${file(../.rake/rds/${self:service}-${self:provider.stage}/vars.yml)}
 
 package:
   exclude:
