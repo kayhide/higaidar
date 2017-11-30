@@ -11,29 +11,33 @@ let sequelize;
 module.exports.hello = (event, context, callback) => {
   context.callbackWaitsForEmptyEventLoop = false;
 
-  co(function *() {
-    if (!sequelize) {
-      sequelize = yield helper.initSequelize();
-      console.log('Connection created');
-    }
-    else {
-      console.log('Connection recycled');
-    }
+  const attempt = (s) => {
+    sequelize = s;
     const User = require('app/model/user').define(sequelize);
-    const users = yield User.findAll();
+    return User.findAll();
+  };
+  const retry = (err) => {
+    if (err.name === 'SequelizeAccessDeniedError') {
+      console.log('authentication retrying...');
+      sequelize = null;
+      return helper.initSequelize().then(attempt);
+    }
+    return Promise.reject(err);
+  }
 
-    console.log(users.map(u => u.dataValues));
-    const response = {
-      statusCode: 200,
-      body: JSON.stringify({
-        message: 'Fine!',
-        users: users
-      })
-    };
-
-    callback(null, response);
-  }).catch(err => {
-    sequelize = null;
-    callback(err);
-  });
+  (sequelize ? Promise.resolve(sequelize) : helper.initSequelize())
+    .then(attempt).catch(retry).then((users) => {
+      console.log(users.map(u => u.dataValues));
+      const response = {
+        statusCode: 200,
+        body: JSON.stringify({
+          message: 'Fine!',
+          users: users
+        })
+      };
+      callback(null, response);
+    }).catch(err => {
+      console.log(err);
+      callback(err);
+    });
 };
