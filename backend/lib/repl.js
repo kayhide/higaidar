@@ -6,7 +6,7 @@ const path = require('path');
 const co = require('co');
 
 
-if (!process.env.USE_REMOTE) {
+if (!process.env.ON_REMOTE) {
   console.log('using localstack...');
 }
 
@@ -46,7 +46,7 @@ co(function *() {
 
 function load() {
   repl.context['_'] = require('lodash');
-  if (process.env.USE_REMOTE) {
+  if (process.env.ON_REMOTE) {
   }
   else {
     const Localstack = require('lib/localstack');

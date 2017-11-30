@@ -245,7 +245,7 @@ end
 ENV['RAILS_ENV'] = $stage
 require 'standalone_migrations'
 
-if ENV['USE_REMOTE']
+if ENV['ON_REMOTE']
   dst_dir = File.join($wrk_dir, 'rds', $database_name)
   db_info = File.join(dst_dir, 'db_info.json')
   info = JSON.load File.open(db_info)
