@@ -14,6 +14,6 @@
   },
   "scripts": {
     "repl": "NODE_PATH=. node lib/repl.js",
-    "deploy": "rake rds:prepare && serverless deploy -v"
+    "deploy": "serverless deploy -v"
   }
 }

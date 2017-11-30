@@ -4,7 +4,7 @@ require 'thor/shell'
 require 'pry'
 
 $stage = ENV.fetch('STAGE', 'dev')
-raise RuntimeError.new("Invalid STAGE: #{$stage}") unless %w(dev prod).include?($stage)
+raise RuntimeError.new("Invalid STAGE: #{$stage}") unless %w(test dev prod).include?($stage)
 
 $root_dir = __dir__
 $dist_dir = "dist/#{$stage}"
@@ -178,7 +178,9 @@ namespace :rds do
          '--publicly-accessible'].join(' ')
   end
 
-  task :pull => [dst_dir] do
+  task :pull => [dst_dir, db_info, my_cnf, envs]
+
+  file db_info do
     with_file db_info, delete_on_fail: true do
       res = aws ['rds', 'describe-db-instances',
                  '--db-instance-identifier', $database_name].join(' ')
@@ -199,6 +201,19 @@ namespace :rds do
        "password=#{password}",
        ''
       ].join("\n")
+    end
+  end
+
+  file envs => [db_info] do
+    info = JSON.load File.open(db_info)
+    with_file envs do
+      {
+        HOST: info['DBInstances'][0]['Endpoint']['Address'],
+        PORT: info['DBInstances'][0]['Endpoint']['Port'],
+        DBI_RESOURCE_ID: info['DBInstances'][0]['DbiResourceId'],
+        USERNAME: 'lambda',
+        DATABASE: $app_basename
+      }.stringify_keys.to_yaml
     end
   end
 
@@ -224,19 +239,27 @@ namespace :rds do
     res = `#{cmd}`
     puts res
   end
+end
 
-  desc 'Create envs setting for deploy'
-  task :prepare => [db_info] do
-    info = JSON.load File.open(db_info)
-    host = info['DBInstances'][0]['Endpoint']['Address']
-    port = info['DBInstances'][0]['Endpoint']['Port']
-    dbi_resource_id = info['DBInstances'][0]['DbiResourceId']
-    with_file envs do
-      {
-        'HOST' => host,
-        'PORT' => port,
-        'DBI_RESOURCE_ID' => dbi_resource_id
-      }.to_yaml
+
+ENV['RAILS_ENV'] = $stage
+require 'standalone_migrations'
+
+if ENV['USE_REMOTE']
+  dst_dir = File.join($wrk_dir, 'rds', $database_name)
+  db_info = File.join(dst_dir, 'db_info.json')
+  info = JSON.load File.open(db_info)
+  StandaloneMigrations::Configurator.environments_config do |stage|
+    stage.on $stage do |conf|
+      conf.slice('adapter', 'encoding').merge(
+        host: info['DBInstances'][0]['Endpoint']['Address'],
+        port: info['DBInstances'][0]['Endpoint']['Port'],
+        username: env['AWS_RDS_MASTER_USERNAME'],
+        password: env['AWS_RDS_MASTER_USER_PASSWORD'],
+        database: $app_basename
+      ).stringify_keys
     end
   end
 end
+
+StandaloneMigrations::Tasks.load_tasks
