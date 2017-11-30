@@ -3,62 +3,37 @@
 const co = require('co');
 const promisify = require('util.promisify');
 const AWS = require('aws-sdk');
-const Sequelize = require('sequelize');
 
-const signer = new AWS.RDS.Signer({
-  region: process.env.AWS_RDS_REGION,
-  hostname: process.env.AWS_RDS_HOST,
-  port: parseInt(process.env.AWS_RDS_PORT),
-  username: process.env.AWS_RDS_USER
-});
+const helper = require('app/helper');
 
-let token;
 let sequelize;
 
 module.exports.hello = (event, context, callback) => {
   context.callbackWaitsForEmptyEventLoop = false;
 
   co(function *() {
-    if (!token) {
-      token = yield promisify(signer.getAuthToken.bind(signer))();
-      const options = {
-        host: process.env.AWS_RDS_HOST,
-        port: parseInt(process.env.AWS_RDS_PORT),
-        ssl: true,
-        dialect: 'mysql',
-        dialectOptions: {
-          ssl: 'Amazon RDS',
-          authSwitchHandler: (data, callback) => {
-            if (data.pluginName === 'mysql_clear_password') {
-              callback(null, Buffer.from(token + '\0'));
-            }
-          }
-        }
-      };
-      sequelize = new Sequelize('mysql', process.env.AWS_RDS_USER, token, options);
+    if (!sequelize) {
+      sequelize = yield helper.initSequelize();
+      console.log('Connection created');
     }
-    const model = sequelize.define('user', {
-      'Host': { type: Sequelize.STRING },
-      'User': { type: Sequelize.STRING, primaryKey: true }
-    }, {
-      tableName: 'user',
-      timestamps: false
-    });
+    else {
+      console.log('Connection recycled');
+    }
+    const User = require('app/model/user').define(sequelize);
+    const users = yield User.findAll();
 
-    const data = yield model.findAll();
-
-    console.log(data);
+    console.log(users.map(u => u.dataValues));
     const response = {
       statusCode: 200,
       body: JSON.stringify({
         message: 'Fine!',
-        data: data
+        users: users
       })
     };
 
     callback(null, response);
   }).catch(err => {
-    token = null;
+    sequelize = null;
     callback(err);
   });
 };
