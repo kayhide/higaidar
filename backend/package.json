@@ -3,17 +3,25 @@
   "dependencies": {
     "aws-sdk": "^2.158.0",
     "co": "^4.6.0",
+    "lodash": "^4.17.4",
     "mysql2": "^1.5.1",
     "sequelize": "^4.23.2",
     "util.promisify": "^1.0.0"
   },
   "devDependencies": {
+    "fs-extra": "^4.0.2",
+    "intelli-espower-loader": "^1.0.1",
     "js-yaml": "^3.10.0",
-    "lodash": "^4.17.4",
+    "mocha": "^4.0.1",
+    "nock": "^9.1.4",
+    "power-assert": "^1.4.4",
     "proxyquire": "^1.8.0",
-    "serverless": "^1.24.1"
+    "serverless": "^1.24.1",
+    "sinon": "^4.1.2"
   },
   "scripts": {
+    "test": "NODE_PATH=. mocha --recursive --require intelli-espower-loader",
+    "test-watch": "NODE_PATH=. mocha --recursive --watch --require intelli-espower-loader",
     "repl": "NODE_PATH=. node lib/repl.js",
     "deploy": "serverless deploy -v"
   }

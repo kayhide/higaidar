@@ -34,3 +34,19 @@ package:
 functions:
   hello:
     handler: handler.hello
+
+  users-index:
+    handler: app/users/handler.index
+    events:
+      - http:
+          path: users
+          method: get
+          cors: true
+
+  users-create:
+    handler: app/users/handler.create
+    events:
+      - http:
+          path: users
+          method: post
+          cors: true

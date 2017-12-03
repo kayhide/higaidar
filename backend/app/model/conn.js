@@ -3,10 +3,10 @@
 const co = require('co');
 const promisify = require('util.promisify');
 const AWS = require('aws-sdk');
+const Sequelize = require('sequelize');
+
 
 module.exports.initSequelize = () => {
-  const Sequelize = require('sequelize');
-
   const region = process.env.AWS_RDS_REGION;
   const host = process.env.AWS_RDS_HOST;
   const port = parseInt(process.env.AWS_RDS_PORT);
