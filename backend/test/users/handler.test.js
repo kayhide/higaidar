@@ -9,6 +9,7 @@ const proxyquire = require('proxyquire');
 
 const helper = require('test/test-helper');
 const fixture = require('test/fixture');
+const factory = require('test/factory');
 
 const identity = x => x;
 
@@ -40,14 +41,13 @@ describe('#index', () => {
 
     it('returns users', () => {
       return co(function *() {
-        yield User.create({ code: 123, name: 'Yamada Taro', tel: '03-1234-5678' });
-        yield User.create({ code: 124, name: 'Tanaka Jiro', tel: '03-9012-3456' });
+        const users = yield factory.createList(User, 2);
 
         const res = yield handle(event, {})
         assert(res.statusCode === 200);
 
         const body = JSON.parse(res.body);
-        assert(_.isEqual(body.map(x => x.code), [123, 124]));
+        assert(_.isEqualWith(body, users.map(x => x.dataValues), (x, y) => x.id === y.id));
       });
     });
   });
