@@ -234,7 +234,7 @@ namespace :rds do
     cmd = ['mysql',
            "--defaults-extra-file=#{my_cnf}",
            '-e',
-           %("GRANT SELECT ON *.* to 'lambda'@'%' REQUIRE SSL;")
+           %("GRANT SELECT,INSERT,UPDATE,DELETE ON *.* to 'lambda'@'%' REQUIRE SSL;")
           ].join(' ')
     res = `#{cmd}`
     puts res
