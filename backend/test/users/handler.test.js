@@ -36,7 +36,7 @@ describe('#index', () => {
 
   context('without params', () => {
     beforeEach(() => {
-      event = fixture.read('users/event_index');
+      event = fixture.read('users/event_get');
     });
 
     it('returns users', () => {
@@ -70,7 +70,7 @@ describe('#create', () => {
     };
 
     beforeEach(() => {
-      event = fixture.read('users/event_create');
+      event = fixture.read('users/event_post');
       event.body = JSON.stringify(attrs);
     });
 
@@ -83,7 +83,7 @@ describe('#create', () => {
         assert(cur === 1);
 
         const user = yield User.findOne();
-        assert(_.isEqual(_.pick(user.dataValues, _.keys(attrs)), attrs));
+        assert(helper.isIncluding(user.dataValues, attrs));
       });
     });
 
@@ -91,7 +91,101 @@ describe('#create', () => {
       return co(function *() {
         const res = yield handle(event, {});
         const body = JSON.parse(res.body);
-        assert(_.isEqual(_.pick(body, _.keys(attrs)), attrs));
+        assert(helper.isIncluding(body, attrs));
+      });
+    });
+  });
+});
+
+describe('#show', () => {
+  let event;
+  let handle;
+  let user;
+
+  beforeEach(() => {
+    const handler = proxyquire('app/users/handler', helper.stub);
+    handle = promisify(handler.show.bind(handler));
+  });
+
+  context('with valid attrs', () => {
+    beforeEach(() => co(function *() {
+      user = yield factory.create(User);
+      event = fixture.read('users/event_get');
+      event.pathParameters = { id: user.id };
+    }));
+
+    it('returns attributes of the user', () => {
+      return co(function *() {
+        const res = yield handle(event, {});
+        const body = JSON.parse(res.body);
+        assert(helper.isEqualModel(body, user));
+      });
+    });
+  });
+});
+
+describe('#update', () => {
+  let event;
+  let handle;
+  let user;
+
+  beforeEach(() => {
+    const handler = proxyquire('app/users/handler', helper.stub);
+    handle = promisify(handler.update.bind(handler));
+  });
+
+  context('with valid attrs', () => {
+    const attrs = {
+      code: 200,
+      name: 'Jiro',
+      tel: '0123-4567-9000'
+    };
+
+    beforeEach(() => co(function *() {
+      user = yield factory.create(User);
+      event = fixture.read('users/event_post');
+      event.httpMethod = 'PATCH';
+      event.requestContext.httpMethod = 'PATCH';
+      event.pathParameters = { id: user.id };
+      event.body = JSON.stringify(attrs);
+    }));
+
+    it('returns attributes of the user', () => {
+      return co(function *() {
+        const res = yield handle(event, {});
+        const body = JSON.parse(res.body);
+        assert(helper.isIncluding(body, attrs));
+      });
+    });
+  });
+});
+
+describe('#destroy', () => {
+  let event;
+  let handle;
+  let user;
+
+  beforeEach(() => {
+    const handler = proxyquire('app/users/handler', helper.stub);
+    handle = promisify(handler.destroy.bind(handler));
+  });
+
+  context('with valid id', () => {
+    beforeEach(() => co(function *() {
+      user = yield factory.create(User);
+      event = fixture.read('users/event_get');
+      event.httpMethod = 'DELETE';
+      event.requestContext.httpMethod = 'DELETE';
+      event.pathParameters = { id: user.id };
+    }));
+
+    it('deletes the user', () => {
+      return co(function *() {
+        const org = yield User.count();
+        yield handle(event, {});
+        const cur = yield User.count();
+        assert(org === 1);
+        assert(cur === 0);
       });
     });
   });

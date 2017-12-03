@@ -50,3 +50,27 @@ functions:
           path: users
           method: post
           cors: true
+
+  users-show:
+    handler: app/users/handler.show
+    events:
+      - http:
+          path: users/{id}
+          method: get
+          cors: true
+
+  users-update:
+    handler: app/users/handler.update
+    events:
+      - http:
+          path: users/{id}
+          method: patch
+          cors: true
+
+  users-destroy:
+    handler: app/users/handler.destroy
+    events:
+      - http:
+          path: users/{id}
+          method: delete
+          cors: true

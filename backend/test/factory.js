@@ -19,7 +19,7 @@ const cur = {
 };
 
 const build = (model, opts = {}) => {
-  return cur[model.name].next().value;
+  return Object.assign(cur[model.name].next().value, opts);
 };
 
 const buildList = (model, n, opts = {}) => {

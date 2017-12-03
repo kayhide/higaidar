@@ -4,6 +4,7 @@ process.env.STAGE = 'test';
 
 const fs = require('fs-extra');
 const path = require('path');
+const _ = require('lodash');
 const yaml = require('js-yaml');
 const co = require('co');
 const nock = require('nock');
@@ -62,4 +63,23 @@ module.exports.stub = {
     initSequelize: initSequelize,
     '@global': true
   }
+};
+
+
+const comparablify = (x) => {
+  const x_ = x.dataValues ? x.dataValues : x;
+  return _.mapValues(x_, v => {
+    if (v instanceof Date) {
+      return new Date(Math.floor(v.getTime() / 1000) * 1000).toJSON();
+    }
+    return v;
+  });
+};
+
+module.exports.isEqualModel = (x, y) => {
+  return _.isEqual(comparablify(x), comparablify(y));
+};
+
+module.exports.isIncluding = (x, y) => {
+  return _.isEqual(_.pick(x, _.keys(y)), y);
 };
