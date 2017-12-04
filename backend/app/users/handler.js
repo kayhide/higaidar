@@ -3,6 +3,9 @@
 const co = require('co');
 const util = require('util');
 
+const verify = require('app/verify');
+const handleSuccess = require('app/handleSuccess');
+const handleError = require('app/handleError');
 const model = require('app/model');
 
 
@@ -11,20 +14,14 @@ module.exports.index = (event, context, callback) => {
   context.callbackWaitsForEmptyEventLoop = false;
 
   co(function *() {
-    const data = yield model.with([`user`], (User) => {
+    const data = yield model.with(['user'], (User) => {
       return User.findAll();
     });
 
     const users = data.map(u => u.dataValues);
-    const response = {
-      statusCode: 200,
-      body: JSON.stringify(users)
-    };
-    callback(null, response);
-  }).catch(err => {
-    console.log(err);
-    callback(err);
-  });
+    handleSuccess(callback)(users);
+
+  }).catch(handleError(callback));
 };
 
 module.exports.create = (event, context, callback) => {
@@ -33,19 +30,13 @@ module.exports.create = (event, context, callback) => {
 
   co(function *() {
     const params = JSON.parse(event.body);
-    const data = yield model.with([`user`], (User) => {
+    const data = yield model.with(['user'], (User) => {
       return User.create(params);
     });
 
-    const response = {
-      statusCode: 200,
-      body: JSON.stringify(data.dataValues)
-    };
-    callback(null, response);
-  }).catch(err => {
-    console.log(err);
-    callback(err);
-  });
+    handleSuccess(callback)(data.dataValues);
+
+  }).catch(handleError(callback));
 };
 
 module.exports.show = (event, context, callback) => {
@@ -54,19 +45,13 @@ module.exports.show = (event, context, callback) => {
 
   co(function *() {
     const id = event.pathParameters.id;
-    const data = yield model.with([`user`], (User) => {
-      return User.findById(id);
+    const data = yield model.with(['user'], (User) => {
+      return User.findById(id).then(verify.presence);
     });
 
-    const response = {
-      statusCode: 200,
-      body: JSON.stringify(data.dataValues)
-    };
-    callback(null, response);
-  }).catch(err => {
-    console.log(err);
-    callback(err);
-  });
+    handleSuccess(callback)(data.dataValues);
+
+  }).catch(handleError(callback));
 };
 
 module.exports.update = (event, context, callback) => {
@@ -76,19 +61,13 @@ module.exports.update = (event, context, callback) => {
   co(function *() {
     const id = event.pathParameters.id;
     const params = JSON.parse(event.body);
-    const data = yield model.with([`user`], (User) => {
-      return User.findById(id).then(u => u.update(params));
+    const data = yield model.with(['user'], (User) => {
+      return User.findById(id).then(verify.presence).then(u => u.update(params));
     });
 
-    const response = {
-      statusCode: 200,
-      body: JSON.stringify(data.dataValues)
-    };
-    callback(null, response);
-  }).catch(err => {
-    console.log(err);
-    callback(err);
-  });
+    handleSuccess(callback)(data.dataValues);
+
+  }).catch(handleError(callback));
 };
 
 module.exports.destroy = (event, context, callback) => {
@@ -97,17 +76,11 @@ module.exports.destroy = (event, context, callback) => {
 
   co(function *() {
     const id = event.pathParameters.id;
-    const data = yield model.with([`user`], (User) => {
-      return User.findById(id).then(u => u.destroy());
+    const data = yield model.with(['user'], (User) => {
+      return User.findById(id).then(verify.presence).then(u => u.destroy());
     });
 
-    const response = {
-      statusCode: 200,
-      body: JSON.stringify(data.dataValues)
-    };
-    callback(null, response);
-  }).catch(err => {
-    console.log(err);
-    callback(err);
-  });
+    handleSuccess(callback)(null);
+
+  }).catch(handleError(callback));
 };
