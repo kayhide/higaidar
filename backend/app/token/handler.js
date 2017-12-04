@@ -1,0 +1,64 @@
+'use strict';
+
+const _ = require('lodash');
+const co = require('co');
+const util = require('util');
+const jwt = require('jsonwebtoken');
+
+const verify = require('app/verify');
+const handleSuccess = require('app/handleSuccess');
+const handleError = require('app/handleError');
+const model = require('app/model');
+
+
+module.exports.create = (event, context, callback) => {
+  // console.log(util.inspect(event, { depth: 5 }));
+  context.callbackWaitsForEmptyEventLoop = false;
+
+  co(function *() {
+    const params = JSON.parse(event.body);
+    const where = {
+      code: params.code || null,
+      tel: params.tel || null
+    }
+    const data = yield model.with(['user'], (User) => {
+      return User.findOne({ where }).then(verify.authention);
+    });
+    const token = jwt.sign(
+      { user: data.dataValues },
+      process.env.JWT_SECRET,
+      { expiresIn: process.env.JWT_EXPIRES_IN }
+    );
+
+    handleSuccess(callback)({ token });
+
+  }).catch(handleError(callback));
+};
+
+module.exports.authorize = (event, context, callback) => {
+  // console.log(util.inspect(event, { depth: 5 }));
+  context.callbackWaitsForEmptyEventLoop = false;
+
+  co(function *() {
+    const token = event.authorizationToken;
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    callback(null, generatePolicy('user', 'Allow', event.methodArn));
+  }).catch(err => {
+    console.log(err);
+    callback('Unauthorized');
+  });
+};
+
+const generatePolicy = function(principalId, effect, resource) {
+  return {
+    principalId: principalId,
+    policyDocument: {
+      Version: '2012-10-17',
+      Statement: [{
+        Action: 'execute-api:Invoke',
+        Effect: effect,
+        Resource: resource
+      }]
+    }
+  }
+}

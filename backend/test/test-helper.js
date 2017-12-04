@@ -79,7 +79,3 @@ const comparablify = (x) => {
 module.exports.isEqualModel = (x, y) => {
   return _.isEqual(comparablify(x), comparablify(y));
 };
-
-module.exports.isIncluding = (x, y) => {
-  return _.isEqual(_.pick(x, _.keys(y)), y);
-};

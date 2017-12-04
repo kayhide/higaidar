@@ -10,13 +10,20 @@ const handle = function* (err) {
   if (err.name === 'AppResourceNotFoundError') {
     yield {
       statusCode: 404,
-      body: { message: 'Resource not found' }
+      body: { message: err.message }
+    };
+  }
+  if (err.name === 'AppAuthenticationFailed') {
+    yield {
+      statusCode: 401,
+      body: { message: err.message }
     };
   }
 
+  console.log(err);
   yield {
     statusCode: 500,
-    body: err
+    body: {}
   }
 };
 

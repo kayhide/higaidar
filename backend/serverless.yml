@@ -18,6 +18,8 @@ provider:
     AWS_RDS_PORT: ${self:custom.rds.PORT}
     AWS_RDS_USERNAME: ${self:custom.rds.USERNAME}
     AWS_RDS_DATABASE: ${self:custom.rds.DATABASE}
+    JWT_SECRET: ${self:custom.env.JWT_SECRET}
+    JWT_EXPIRES_IN: ${self:custom.env.JWT_EXPIRES_IN}
 
 custom:
   env: ${file(../.env.${self:provider.stage}.yml)}
@@ -32,8 +34,16 @@ package:
     - node_modules/aws-sdk/**
 
 functions:
-  hello:
-    handler: handler.hello
+  authorize:
+    handler: app/token/handler.authorize
+    
+  token-create:
+    handler: app/token/handler.create
+    events:
+      - http:
+          path: token
+          method: post
+          cors: true
 
   users-index:
     handler: app/users/handler.index
@@ -42,6 +52,7 @@ functions:
           path: users
           method: get
           cors: true
+          authorizer: authorize
 
   users-create:
     handler: app/users/handler.create
@@ -50,6 +61,7 @@ functions:
           path: users
           method: post
           cors: true
+          authorizer: authorize
 
   users-show:
     handler: app/users/handler.show
@@ -58,6 +70,7 @@ functions:
           path: users/{id}
           method: get
           cors: true
+          authorizer: authorize
 
   users-update:
     handler: app/users/handler.update
@@ -66,6 +79,7 @@ functions:
           path: users/{id}
           method: patch
           cors: true
+          authorizer: authorize
 
   users-destroy:
     handler: app/users/handler.destroy
@@ -74,3 +88,4 @@ functions:
           path: users/{id}
           method: delete
           cors: true
+          authorizer: authorize

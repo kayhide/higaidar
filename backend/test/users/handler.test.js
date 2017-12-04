@@ -11,13 +11,12 @@ const helper = require('test/test-helper');
 const fixture = require('test/fixture');
 const factory = require('test/factory');
 
-const identity = x => x;
 
 let model;
 let User;
 before(() => co(function *(){
   model = proxyquire('app/model', helper.stub);
-  User = yield model.with(['user'], identity);
+  User = yield model.with(['user'], _.identity);
 }));
 
 beforeEach(() => co(function *(){
@@ -82,7 +81,7 @@ describe('#create', () => {
         assert(cur === 1);
 
         const user = yield User.findOne();
-        assert(helper.isIncluding(user.dataValues, attrs));
+        assert(_.matches(user.dataValues, attrs));
       });
     });
 
@@ -92,7 +91,7 @@ describe('#create', () => {
         assert(res.statusCode === 200);
 
         const body = JSON.parse(res.body);
-        assert(helper.isIncluding(body, attrs));
+        assert(_.matches(body, attrs));
       });
     });
   });
@@ -199,7 +198,7 @@ describe('#update', () => {
         assert(res.statusCode === 200);
 
         const body = JSON.parse(res.body);
-        assert(helper.isIncluding(body, attrs));
+        assert(_.matches(body, attrs));
       });
     });
   });
