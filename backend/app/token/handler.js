@@ -40,10 +40,13 @@ module.exports.authorize = (event, context, callback) => {
   context.callbackWaitsForEmptyEventLoop = false;
 
   co(function *() {
-    const token = event.authorizationToken;
+    const m = event.authorizationToken.match(/^Bearer (.+)/);
+    if (!m) throw new Error('Bad token');
+    const token = m[1];
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     callback(null, generatePolicy('user', 'Allow', event.methodArn));
   }).catch(err => {
+    console.log(util.inspect(event, { depth: 5 }));
     console.log(err);
     callback('Unauthorized');
   });

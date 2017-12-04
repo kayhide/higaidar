@@ -97,16 +97,38 @@ describe('#authorize', () => {
     )
     event = {};
     event.methodArn = 'arn:aws:execute-api:ap-northheast-1::api-id/test/GET/something';
-    event.authorizationToken = token;
+    event.authorizationToken = `Bearer ${token}`;
   }));
 
-  context('with valid attrs', () => {
-    it('returns allowed policy', () => {
+  context('with valid token', () => {
+    it('authorizes', () => {
       return co(function *() {
         const res = yield handle(event, {});
         assert(res.policyDocument.Statement[0].Action === 'execute-api:Invoke');
         assert(res.policyDocument.Statement[0].Effect === 'Allow');
         assert(res.policyDocument.Statement[0].Resource === event.methodArn);
+      });
+    });
+  });
+
+  context('with invalid token', () => {
+    it('unauthorizes', () => {
+      event.authorizationToken = 'invalid';
+      return co(function *() {
+        yield handle(event, {});
+      }).then(() => assert(false), err => {
+        assert(err === 'Unauthorized');
+      });
+    });
+  });
+
+  context('with malformed token', () => {
+    it('unauthorizes', () => {
+      event.authorizationToken = token;
+      return co(function *() {
+        yield handle(event, {});
+      }).then(() => assert(false), err => {
+        assert(err === 'Unauthorized');
       });
     });
   });
