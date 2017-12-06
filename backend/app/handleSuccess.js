@@ -9,16 +9,14 @@ const handle = function* (body, opts) {
 
   yield {
     statusCode: opts.statusCode || 200,
-    body: body
+    body: JSON.stringify(body)
   };
 };
 
 module.exports = (callback) => (body, opts = {}) => {
   const res = handle(body, opts).next().value;
-  if (res.body) {
-    callback(null, { statusCode: res.statusCode, body: JSON.stringify(res.body) });
-  }
-  else {
-    callback(null, { statusCode: res.statusCode });
-  }
+  res.headers = {
+    "Access-Control-Allow-Origin": "*"
+  };
+  callback(null, res);
 };

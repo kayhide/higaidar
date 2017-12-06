@@ -29,5 +29,9 @@ const handle = function* (err) {
 
 module.exports = (callback) => (err) => {
   const res = handle(err).next().value;
-  callback(null, { statusCode: res.statusCode, body: JSON.stringify(res.body) });
+  res.headers = {
+    "Access-Control-Allow-Origin": "*"
+  };
+  res.body = JSON.stringify(res.body);
+  callback(null, res);
 };
