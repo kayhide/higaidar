@@ -22,7 +22,8 @@ main :: Eff AppEffs Unit
 main = HA.runHalogenAff do
   body <- HA.awaitBody
   appConfig <- liftEff readConfig
-  runUI MainUI.ui appConfig body
+  driver <- runUI MainUI.ui appConfig body
+  liftEff $ MainUI.matchRoute driver
 
 readConfig :: Eff AppEffs AppConfig
 readConfig = do

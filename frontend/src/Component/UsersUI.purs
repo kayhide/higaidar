@@ -7,7 +7,6 @@ import Api.Users as Users
 import Control.Monad.Aff (Aff, attempt)
 import Control.Monad.Eff.Exception (error)
 import Control.Monad.Except (ExceptT, lift, runExcept, runExceptT, throwError)
-import Control.Monad.State (class MonadState)
 import Data.DateTime as DateTime
 import Data.DateTime.Locale (Locale(Locale))
 import Data.Either (Either(..), either)
@@ -22,25 +21,27 @@ import Halogen.HTML as HH
 import Halogen.HTML.Properties as HP
 import Model.User (User(..), Users)
 import Network.HTTP.Affjax (AJAX, URL)
+import Route as R
 
 
 data Query a
-  = SetLocale Locale a
-  | SetToken AuthenticationToken a
+  = Initialize a
+  | SetLocale Locale a
   | Scan a
 
 type State =
   { items :: Users
-  , token :: Maybe AuthenticationToken
   , baseUrl :: URL
+  , token :: AuthenticationToken
   , locale :: Locale
   , alerts :: Array String
   , busy :: Boolean
   }
 
 type Input =
-  { locale :: Locale
-  , baseUrl :: URL
+  { baseUrl :: URL
+  , token :: AuthenticationToken
+  , locale :: Locale
   }
 
 data Message
@@ -51,27 +52,32 @@ type Eff_ eff = Aff (ajax :: AJAX | eff)
 
 ui :: forall eff. H.Component HH.HTML Query Input Message (Eff_ eff)
 ui =
-  H.component
+  H.lifecycleComponent
     { initialState: initialState
     , render
     , eval
     , receiver: const Nothing
+    , initializer: Just $ H.action Initialize
+    , finalizer: Nothing
     }
 
 initialState :: Input -> State
-initialState { locale, baseUrl } =
+initialState { locale, token, baseUrl } =
     { items: []
-    , token: Nothing
-    , baseUrl: baseUrl
+    , baseUrl
+    , token
+    , locale
     , alerts: []
     , busy: false
-    , locale: locale
     }
 
 render :: State -> H.ComponentHTML Query
 render state =
   HH.div_
-  [ HH.div
+  [
+    HH.h1_
+    [ HH.text "User List" ]
+  , HH.div
     [ HP.class_ $ H.ClassName "row" ]
     (renderItem <$> state.items)
   , HH.div_ (renderAlert <$> state.alerts)
@@ -106,7 +112,11 @@ render state =
               [ HP.class_ $ H.ClassName "fa fa-user"
               , HP.title name
               ] []
-            , HH.text name
+            , HH.a
+              [ HP.href $ R.path $ R.UsersShow id ]
+              [
+                HH.text name
+              ]
             ]
           -- , HH.p
           --   [ HP.classes [ H.ClassName "card-text small" ] ]
@@ -127,18 +137,17 @@ render state =
 
 eval :: forall eff. Query ~> H.ComponentDSL State Query Message (Eff_ eff)
 eval = case _ of
+  Initialize next -> do
+    eval $ Scan next
+
   SetLocale locale next -> do
     H.modify _{ locale = locale }
     pure next
 
-  SetToken token next -> do
-    H.modify _{ token = Just token }
-    pure next
-
   Scan next -> do
     url <- H.gets _.baseUrl
+    token <- H.gets _.token
     res <- runExceptT do
-      token <- verifyToken
       users <- onLeft "Failed to access api" =<< (H.liftAff $ attempt $ Users.index url token)
       lift do
         H.modify _{ items = users }
@@ -149,10 +158,6 @@ eval = case _ of
 
 onNothing :: forall m. Monad m => String -> Maybe ~> ExceptT String m
 onNothing s = maybe (throwError s) pure
-
-verifyToken :: forall m. MonadState State m => ExceptT String m AuthenticationToken
-verifyToken =
-  onNothing "Token is not ready" =<< (lift $ H.gets _.token)
 
 onLeft :: forall e m. Monad m => String -> Either e ~> ExceptT String m
 onLeft s = either (throwError <<< const s) pure

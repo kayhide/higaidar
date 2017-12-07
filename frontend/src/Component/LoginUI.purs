@@ -68,12 +68,12 @@ render state =
     [ HP.class_ $ H.ClassName "navbar-text mr-2" ]
     [ HH.text $ show $ state.code ]
   , HH.input
-    [ HP.class_ $ H.ClassName "input"
+    [ HP.class_ $ H.ClassName "form-control form-control-sm mr-2"
     , HP.value $ show state.code
     , HE.onValueInput $ HE.input SetCode
     ]
   , HH.input
-    [ HP.class_ $ H.ClassName "input"
+    [ HP.class_ $ H.ClassName "form-control form-control-sm mr-2"
     , HP.value state.tel
     , HE.onValueInput $ HE.input SetTel
     ]

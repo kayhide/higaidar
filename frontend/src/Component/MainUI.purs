@@ -2,27 +2,32 @@ module Component.MainUI where
 
 import Prelude
 
+import Api.Token (AuthenticationToken)
 import Component.LoginUI as LoginUI
 import Component.NoticeUI as NoticeUI
 import Component.UsersUI as UsersUI
-import Control.Monad.Aff (Aff, attempt)
+import Control.Monad.Aff (Aff, attempt, launchAff_)
+import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Now (NOW)
 import Control.Monad.Eff.Now as Now
 import Data.DateTime.Locale (Locale(..), LocaleName(..))
 import Data.Either (Either(..))
 import Data.Either.Nested (Either3)
 import Data.Functor.Coproduct.Nested (Coproduct3)
-import Data.Maybe (Maybe(..), maybe)
+import Data.Maybe (Maybe(Nothing, Just))
 import Data.Time.Duration (Minutes(..))
 import Data.Tuple (Tuple(..))
 import Dom.Storage (STORAGE)
 import Dom.Storage as Storage
 import Halogen as H
+import Halogen.Aff as HA
 import Halogen.Component.ChildPath as CP
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Network.HTTP.Affjax (AJAX)
+import Route as R
+import Routing (matches)
 
 
 type AppConfig =
@@ -35,13 +40,14 @@ data Query a
   | HandleNotice NoticeUI.Message a
   | HandleLogin LoginUI.Message a
   | HandleUsers UsersUI.Message a
-  | RequestScanUsers a
+  | Goto R.Location a
 
 type State =
   { appConfig :: AppConfig
-  , photosCount :: Maybe Int
   , authenticated :: Boolean
+  , token :: Maybe AuthenticationToken
   , locale :: Locale
+  , location :: R.Location
   }
 
 type Input = AppConfig
@@ -78,9 +84,10 @@ ui :: forall eff. H.Component HH.HTML Query Input Message (Eff_ eff)
 ui =
   H.lifecycleParentComponent
     { initialState: { appConfig: _
-                    , photosCount: Nothing
                     , authenticated: false
+                    , token: Nothing
                     , locale: Locale (Just (LocaleName "GMT")) (Minutes 0.0)
+                    , location: R.Home
                     }
     , render
     , eval
@@ -96,34 +103,25 @@ render state =
     HH.nav
     [ HP.class_ $ H.ClassName "navbar navbar-dark bg-dark" ]
     [
-      HH.span
-      [ HP.class_ $ H.ClassName "navbar-brand mb-0" ]
+      HH.a
+      [ HP.class_ $ H.ClassName "navbar-brand mb-0"
+      , HP.href $ R.path R.Home
+      ]
       [ HH.text "Higaidar Admin" ]
-    , HH.slot' cpLogin LoginSlot LoginUI.ui loginConfig $ HE.input HandleLogin
+    , HH.slot' cpLogin LoginSlot LoginUI.ui { baseUrl } $ HE.input HandleLogin
     ]
   , HH.slot' cpNotice NoticeSlot NoticeUI.ui unit $ HE.input HandleNotice
   , HH.main
     [ HP.class_ $ H.ClassName "container mt-2" ]
     [
-      HH.h1_
-      [ HH.text "User List" ]
-    , HH.p_
-      [ HH.text photosCount_ ]
-    , HH.button
-      [ HP.class_ $ H.ClassName updateButtonClass
-      , HP.title "Update"
-      , HE.onClick (HE.input_ RequestScanUsers)
-      ]
-      [ HH.text "Update" ]
-    , renderUsers state.authenticated state.locale
+      HH.a [ HP.href $ R.path $ R.UsersIndex ] [ HH.text "Users" ]
+    , renderPage state.location
     ]
   ]
 
   where
-    photosCount_ = maybe "(unknown)" show state.photosCount
-    loginConfig =
-      { baseUrl: state.appConfig.apiEndpoint
-      }
+    baseUrl = state.appConfig.apiEndpoint
+    locale = state.locale
 
     updateButtonClass =
       "btn btn-outline-primary mb-2" <>
@@ -131,14 +129,18 @@ render state =
       then ""
       else " disabled"
 
-    renderUsers false _ = HH.div_ []
-    renderUsers true locale =
-      HH.slot' cpUsers unit UsersUI.ui uiInput $ HE.input HandleUsers
-      where
-        uiInput =
-          { locale
-          , baseUrl: state.appConfig.apiEndpoint
-          }
+    renderPage = case _ of
+      R.Home ->
+        HH.p_ [ HH.text $ "Home" ]
+
+      R.UsersIndex -> case state.token of
+        Just token ->
+          HH.slot' cpUsers unit UsersUI.ui { baseUrl, token, locale } $ HE.input HandleUsers
+        Nothing ->
+          HH.text $ "Not authenticated"
+
+      R.UsersShow i ->
+        HH.p_ [ HH.text $ "User " <> show i ]
 
 eval :: forall eff. Query ~> H.ParentDSL State Query ChildQuery ChildSlot Message (Eff_ eff)
 eval = case _ of
@@ -164,17 +166,16 @@ eval = case _ of
     pure next
 
   HandleLogin (LoginUI.Authenticated code tel token) next -> do
-    H.modify _{ authenticated = true }
+    H.modify _{ authenticated = true, token = Just token }
     postInfo "Authenticated."
     H.liftAff do
       Storage.set "user.code" code
       Storage.set "user.tel" tel
-    void $ H.query' cpUsers unit $ H.action $ UsersUI.SetToken token
-    eval $ RequestScanUsers next
+    pure next
 
   HandleLogin (LoginUI.Failed s) next -> do
-    postAlert s
     H.modify _{ authenticated = false }
+    postAlert s
     pure next
 
   HandleUsers (UsersUI.Failed s) next -> do
@@ -182,13 +183,20 @@ eval = case _ of
     postAlert "Try login again."
     pure next
 
-  RequestScanUsers next -> do
-    void $ H.query' cpUsers unit $ H.action UsersUI.Scan
+  Goto loc next -> do
+    H.modify $ _{ location = loc }
     pure next
-
 
   where
     postNotice notice =
       void $ H.query' cpNotice NoticeSlot $ H.action $ NoticeUI.Post notice
     postInfo s = postNotice $ NoticeUI.Info s
     postAlert s = postNotice $ NoticeUI.Alert s
+
+
+
+matchRoute :: forall eff. H.HalogenIO Query Void (Aff (HA.HalogenEffects eff))
+              -> Eff (HA.HalogenEffects eff) Unit
+matchRoute driver = matches R.routing $ redirects driver
+  where
+    redirects driver _ = launchAff_ <<< driver.query <<< H.action <<< Goto
