@@ -14,7 +14,7 @@ import Data.DateTime.Locale (Locale(..), LocaleName(..))
 import Data.Either (Either(..))
 import Data.Either.Nested (Either3)
 import Data.Functor.Coproduct.Nested (Coproduct3)
-import Data.Maybe (Maybe(Nothing, Just))
+import Data.Maybe (Maybe(Nothing, Just), maybe)
 import Data.Time.Duration (Minutes(..))
 import Data.Tuple (Tuple(..))
 import Dom.Storage (STORAGE)
@@ -44,7 +44,6 @@ data Query a
 
 type State =
   { appConfig :: AppConfig
-  , authenticated :: Boolean
   , token :: Maybe AuthenticationToken
   , locale :: Locale
   , location :: R.Location
@@ -54,28 +53,16 @@ type Input = AppConfig
 
 type Message = Void
 
-data NoticeSlot = NoticeSlot
-derive instance eqNoticeSlot :: Eq NoticeSlot
-derive instance ordNoticeSlot :: Ord NoticeSlot
-
-data LoginSlot = LoginSlot
-derive instance eqLoginSlot :: Eq LoginSlot
-derive instance ordLoginSlot :: Ord LoginSlot
-
-data UsersSlot = UsersSlot
-derive instance eqUsersSlot :: Eq UsersSlot
-derive instance ordUsersSlot :: Ord UsersSlot
-
 type ChildQuery = Coproduct3 NoticeUI.Query LoginUI.Query UsersUI.Query
-type ChildSlot = Either3 NoticeSlot LoginSlot Unit
+type ChildSlot = Either3 NoticeUI.Slot LoginUI.Slot UsersUI.Slot
 
-cpNotice :: CP.ChildPath NoticeUI.Query ChildQuery NoticeSlot ChildSlot
+cpNotice :: CP.ChildPath NoticeUI.Query ChildQuery NoticeUI.Slot ChildSlot
 cpNotice = CP.cp1
 
-cpLogin :: CP.ChildPath LoginUI.Query ChildQuery LoginSlot ChildSlot
+cpLogin :: CP.ChildPath LoginUI.Query ChildQuery LoginUI.Slot ChildSlot
 cpLogin = CP.cp2
 
-cpUsers :: CP.ChildPath UsersUI.Query ChildQuery Unit ChildSlot
+cpUsers :: CP.ChildPath UsersUI.Query ChildQuery UsersUI.Slot ChildSlot
 cpUsers = CP.cp3
 
 type Eff_ eff = Aff (ajax :: AJAX, now :: NOW, storage :: STORAGE | eff)
@@ -84,7 +71,6 @@ ui :: forall eff. H.Component HH.HTML Query Input Message (Eff_ eff)
 ui =
   H.lifecycleParentComponent
     { initialState: { appConfig: _
-                    , authenticated: false
                     , token: Nothing
                     , locale: Locale (Just (LocaleName "GMT")) (Minutes 0.0)
                     , location: R.Home
@@ -108,14 +94,26 @@ render state =
       , HP.href $ R.path R.Home
       ]
       [ HH.text "Higaidar Admin" ]
-    , HH.slot' cpLogin LoginSlot LoginUI.ui { baseUrl } $ HE.input HandleLogin
+    , HH.ul
+      [ HP.class_ $ H.ClassName "navbar-nav mr-auto" ]
+      [
+        HH.li
+        [ HP.class_ $ H.ClassName "nav-item" ]
+        [
+          HH.a
+          [ HP.class_ $ H.ClassName "nav-link"
+          , HP.href $ R.path $ R.UsersIndex
+          ]
+          [ HH.text "Users" ]
+        ]
+      ]
+    , HH.slot' cpLogin LoginUI.Slot LoginUI.ui { baseUrl } $ HE.input HandleLogin
     ]
-  , HH.slot' cpNotice NoticeSlot NoticeUI.ui unit $ HE.input HandleNotice
+  , HH.slot' cpNotice NoticeUI.Slot NoticeUI.ui unit $ HE.input HandleNotice
   , HH.main
     [ HP.class_ $ H.ClassName "container mt-2" ]
     [
-      HH.a [ HP.href $ R.path $ R.UsersIndex ] [ HH.text "Users" ]
-    , renderPage state.location
+      renderPage state.location
     ]
   ]
 
@@ -124,10 +122,7 @@ render state =
     locale = state.locale
 
     updateButtonClass =
-      "btn btn-outline-primary mb-2" <>
-      if state.authenticated
-      then ""
-      else " disabled"
+      "btn btn-outline-primary mb-2" <> maybe " disabled" (const "") state.token
 
     renderPage = case _ of
       R.Home ->
@@ -135,7 +130,7 @@ render state =
 
       R.UsersIndex -> case state.token of
         Just token ->
-          HH.slot' cpUsers unit UsersUI.ui { baseUrl, token, locale } $ HE.input HandleUsers
+          HH.slot' cpUsers UsersUI.Slot UsersUI.ui { baseUrl, token, locale } $ HE.input HandleUsers
         Nothing ->
           HH.text $ "Not authenticated"
 
@@ -154,9 +149,9 @@ eval = case _ of
 
     case user of
       Right (Tuple code tel) -> do
-        void $ H.query' cpLogin LoginSlot $ H.action $ LoginUI.SetCode code
-        void $ H.query' cpLogin LoginSlot $ H.action $ LoginUI.SetTel tel
-        void $ H.query' cpLogin LoginSlot $ H.action $ LoginUI.Authenticate
+        void $ H.query' cpLogin LoginUI.Slot $ H.action $ LoginUI.SetCode code
+        void $ H.query' cpLogin LoginUI.Slot $ H.action $ LoginUI.SetTel tel
+        void $ H.query' cpLogin LoginUI.Slot $ H.action $ LoginUI.Authenticate
       Left _ ->
         pure unit
 
@@ -166,7 +161,7 @@ eval = case _ of
     pure next
 
   HandleLogin (LoginUI.Authenticated code tel token) next -> do
-    H.modify _{ authenticated = true, token = Just token }
+    H.modify _{ token = Just token }
     postInfo "Authenticated."
     H.liftAff do
       Storage.set "user.code" code
@@ -174,11 +169,12 @@ eval = case _ of
     pure next
 
   HandleLogin (LoginUI.Failed s) next -> do
-    H.modify _{ authenticated = false }
+    H.modify _{ token = Nothing }
     postAlert s
     pure next
 
   HandleUsers (UsersUI.Failed s) next -> do
+    H.modify _{ token = Nothing }
     postAlert "Failed to access database."
     postAlert "Try login again."
     pure next
@@ -189,7 +185,7 @@ eval = case _ of
 
   where
     postNotice notice =
-      void $ H.query' cpNotice NoticeSlot $ H.action $ NoticeUI.Post notice
+      void $ H.query' cpNotice NoticeUI.Slot $ H.action $ NoticeUI.Post notice
     postInfo s = postNotice $ NoticeUI.Info s
     postAlert s = postNotice $ NoticeUI.Alert s
 
@@ -197,6 +193,6 @@ eval = case _ of
 
 matchRoute :: forall eff. H.HalogenIO Query Void (Aff (HA.HalogenEffects eff))
               -> Eff (HA.HalogenEffects eff) Unit
-matchRoute driver = matches R.routing $ redirects driver
+matchRoute driver = matches R.routing $ redirects
   where
-    redirects driver _ = launchAff_ <<< driver.query <<< H.action <<< Goto
+    redirects _ = launchAff_ <<< driver.query <<< H.action <<< Goto

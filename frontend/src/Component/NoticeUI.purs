@@ -4,7 +4,7 @@ import Prelude
 
 import Control.Monad.Aff (Aff, Milliseconds(Milliseconds), delay, error)
 import Control.Monad.Eff.Exception (Error)
-import Data.Lens (Lens, assign, modifying, over, set, use, view)
+import Data.Lens (Lens, assign, modifying, use)
 import Data.Lens.At (at)
 import Data.Lens.Index (ix)
 import Data.Lens.Record (prop)
@@ -25,6 +25,11 @@ data Notice = Info String | Alert String
 noticeBody :: Notice -> String
 noticeBody (Info s) = s
 noticeBody (Alert s) = s
+
+
+data Slot = Slot
+derive instance eqNoticeSlot :: Eq Slot
+derive instance ordNoticeSlot :: Ord Slot
 
 
 type ItemId = Int

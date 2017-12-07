@@ -24,6 +24,11 @@ import Network.HTTP.Affjax (AJAX, URL)
 import Route as R
 
 
+data Slot = Slot
+derive instance eqUsersSlot :: Eq Slot
+derive instance ordUsersSlot :: Ord Slot
+
+
 data Query a
   = Initialize a
   | SetLocale Locale a

@@ -17,12 +17,17 @@ import Halogen.HTML.Properties as HP
 import Network.HTTP.Affjax (AJAX, URL)
 
 
-type LoginConfig =
+data Slot = Slot
+derive instance eqSlot :: Eq Slot
+derive instance ordSlot :: Ord Slot
+
+
+type Config =
   { baseUrl :: URL
   }
 
 type State =
-  { config :: LoginConfig
+  { config :: Config
   , code :: UserCode
   , tel :: UserTel
   , token :: Maybe AuthenticationToken
@@ -35,7 +40,7 @@ data Query a
   | SetCode String a
   | SetTel String a
 
-type Input = LoginConfig
+type Input = Config
 
 data Message
   = Authenticated UserCode UserTel AuthenticationToken
@@ -61,7 +66,7 @@ ui =
 
 render :: State -> H.ComponentHTML Query
 render state =
-  HH.div
+  HH.form
   [ HP.class_ $ H.ClassName "form-inline my-2 my-lg-0" ]
   [
     HH.span
