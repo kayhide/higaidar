@@ -1,0 +1,32 @@
+{
+  "private": true,
+  "dependencies": {
+    "aws-sdk": "^2.132.0"
+  },
+  "devDependencies": {
+    "browser-sync": "^2.18.13",
+    "concurrently": "^3.5.0",
+    "extract-text-webpack-plugin": "^3.0.2",
+    "html-loader": "^0.5.1",
+    "html-webpack-exclude-assets-plugin": "^0.0.5",
+    "html-webpack-plugin": "^2.30.1",
+    "js-yaml": "^3.10.0",
+    "live-server": "^1.2.0",
+    "markdown-loader": "^2.0.1",
+    "webpack": "^3.8.1",
+    "webpack-cleanup-plugin": "^0.5.1",
+    "xhr2": "^0.1.4"
+  },
+  "scripts": {
+    "build": "pulp build && webpack",
+    "repl": "pulp repl",
+    "test": "NODE_PATH=. pulp test",
+    "test-watch": "NODE_PATH=. pulp --watch test",
+    "watch": "webpack --watch",
+    "live-server": "live-server dist/dev --host=localhost --port=3000 --wait 1000 --watch dist/dev/*",
+    "browser-sync": "browser-sync start --server --ss dist/dev --files dist/dev --no-ui --no-notify",
+    "dev": "concurrently \"yarn run watch\" \"yarn run browser-sync\"",
+    "browse": "rake browse",
+    "deploy": "rake s3:deploy"
+  }
+}

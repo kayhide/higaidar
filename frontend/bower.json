@@ -1,0 +1,25 @@
+{
+  "private": true,
+  "name": "agrishot-frontend",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "output",
+    "dist"
+  ],
+  "dependencies": {
+    "purescript-console": "^3.0.0",
+    "purescript-halogen": "^3.0.0",
+    "purescript-random": "^3.0.0",
+    "purescript-foreign-generic": "^5.0.0",
+    "purescript-datetime": "^3.4.0",
+    "purescript-formatters": "^3.0.0",
+    "purescript-newtype": "^2.0.0",
+    "purescript-now": "^3.0.0",
+    "purescript-affjax": "^5.0.0"
+  },
+  "devDependencies": {
+    "purescript-psci-support": "^3.0.0"
+  }
+}

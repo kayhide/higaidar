@@ -7,7 +7,7 @@ $stage = ENV.fetch('STAGE', 'dev')
 raise RuntimeError.new("Invalid STAGE: #{$stage}") unless %w(test dev prod).include?($stage)
 
 $root_dir = __dir__
-$dist_dir = "dist/#{$stage}"
+$dist_dir = "frontend/dist/#{$stage}"
 $config_dir = 'config'
 $wrk_dir = '.rake'
 $env_file = ".env.#{$stage}.yml"
@@ -18,6 +18,7 @@ $profile = "#{$app_name}-deploy"
 $domain_prefix = [$app_basename, ($stage == 'prod') ? nil : $stage].compact.join('-')
 $domain = "#{$domain_prefix}.agrishot.com"
 $bucket_name = $domain
+$api_name = "#{$stage}-#{$app_basename}"
 $database_name = $app_name
 
 Dir.chdir $root_dir
@@ -151,6 +152,35 @@ namespace :s3 do
       info = JSON.load(res)
       region = info['LocationConstraint']
       "http://#{$bucket_name}.s3-website-#{region}.amazonaws.com"
+    end
+  end
+end
+
+namespace :apigateway do
+  dst_dir = File.join($wrk_dir, 'apigateway', $api_name)
+  rest_apis_info = File.join(dst_dir, 'rest_apis_info.json')
+  vars = File.join(dst_dir, 'vars.yml')
+
+  directory dst_dir
+
+  task :pull => [dst_dir, vars]
+
+  file rest_apis_info do
+    with_file rest_apis_info, delete_on_fail: true do
+      aws ['apigateway', 'get-rest-apis'].join(' ')
+    end
+  end
+
+  file vars => [rest_apis_info] do
+    info = JSON.load File.open(rest_apis_info)
+    item = info['items'].find { |item| item['name'] == $api_name }
+    region = aws ['configure', 'get', 'region'].join(' ')
+    region.chomp!
+
+    with_file vars do
+      {
+        ENDPOINT: "https://#{item['id']}.execute-api.#{region}.amazonaws.com/#{$stage}"
+      }.stringify_keys.to_yaml
     end
   end
 end

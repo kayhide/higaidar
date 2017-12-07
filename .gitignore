@@ -6,6 +6,9 @@ tmp/*
 
 .rake
 
+frontend/.psc-ide-port
+frontend/dist
+
 # package directories
 node_modules
 jspm_packages
@@ -74,6 +77,18 @@ typings/
 
 # dotenv environment variables file
 .env
+
+
+### https://raw.github.com/github/gitignore/c0c1a480a906df0e023f3250cf2ad82f1612be67/purescript.gitignore
+
+# Dependencies
+.psci_modules
+bower_components
+node_modules
+
+# Generated files
+.psci
+output
 
 
 
