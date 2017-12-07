@@ -6,17 +6,15 @@ import Api.Token (AuthenticationToken)
 import Component.LoginUI as LoginUI
 import Component.NoticeUI as NoticeUI
 import Component.UsersUI as UsersUI
-import Control.Monad.Aff (Aff, attempt, launchAff_)
+import Control.Monad.Aff (Aff, launchAff_)
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Now (NOW)
 import Control.Monad.Eff.Now as Now
 import Data.DateTime.Locale (Locale(..), LocaleName(..))
-import Data.Either (Either(..))
 import Data.Either.Nested (Either3)
 import Data.Functor.Coproduct.Nested (Coproduct3)
 import Data.Maybe (Maybe(Nothing, Just), maybe)
 import Data.Time.Duration (Minutes(..))
-import Data.Tuple (Tuple(..))
 import Dom.Storage (STORAGE)
 import Dom.Storage as Storage
 import Halogen as H
@@ -45,8 +43,10 @@ data Query a
 type State =
   { appConfig :: AppConfig
   , token :: Maybe AuthenticationToken
+  , userName :: Maybe String
   , locale :: Locale
   , location :: R.Location
+  , locationAfterLogin :: R.Location
   }
 
 type Input = AppConfig
@@ -72,8 +72,10 @@ ui =
   H.lifecycleParentComponent
     { initialState: { appConfig: _
                     , token: Nothing
+                    , userName: Nothing
                     , locale: Locale (Just (LocaleName "GMT")) (Minutes 0.0)
                     , location: R.Home
+                    , locationAfterLogin: R.Home
                     }
     , render
     , eval
@@ -107,7 +109,14 @@ render state =
           [ HH.text "Users" ]
         ]
       ]
-    , HH.slot' cpLogin LoginUI.Slot LoginUI.ui { baseUrl } $ HE.input HandleLogin
+    , renderUserName
+    , HH.a
+      [ HP.class_ $ H.ClassName $ "btn btn-sm " <> maybe "btn-outline-secondary" (const "btn-secondary") state.token
+      , HP.href $ R.path R.Login
+      ]
+      [
+        HH.i [ HP.class_ $ H.ClassName "fa fa-user fa-fw" ] []
+      ]
     ]
   , HH.slot' cpNotice NoticeUI.Slot NoticeUI.ui unit $ HE.input HandleNotice
   , HH.main
@@ -124,9 +133,19 @@ render state =
     updateButtonClass =
       "btn btn-outline-primary mb-2" <> maybe " disabled" (const "") state.token
 
+    renderUserName = case state.userName of
+      Just userName ->
+          HH.span
+          [ HP.class_ $ H.ClassName "navbar-text mr-2" ]
+          [ HH.text $ userName  ]
+      Nothing -> HH.span_ []
+
     renderPage = case _ of
       R.Home ->
         HH.p_ [ HH.text $ "Home" ]
+
+      R.Login ->
+        HH.slot' cpLogin LoginUI.Slot LoginUI.ui { baseUrl } $ HE.input HandleLogin
 
       R.UsersIndex -> case state.token of
         Just token ->
@@ -142,26 +161,14 @@ eval = case _ of
   Initialize next -> do
     locale <- H.liftEff Now.locale
     H.modify _{ locale = locale }
-    user <- H.liftAff $ attempt do
-      code <- Storage.get "user.code"
-      tel <- Storage.get "user.tel"
-      pure $ Tuple code tel
-
-    case user of
-      Right (Tuple code tel) -> do
-        void $ H.query' cpLogin LoginUI.Slot $ H.action $ LoginUI.SetCode code
-        void $ H.query' cpLogin LoginUI.Slot $ H.action $ LoginUI.SetTel tel
-        void $ H.query' cpLogin LoginUI.Slot $ H.action $ LoginUI.Authenticate
-      Left _ ->
-        pure unit
-
     pure next
 
   HandleNotice (NoticeUI.Closed i) next -> do
     pure next
 
   HandleLogin (LoginUI.Authenticated code tel token) next -> do
-    H.modify _{ token = Just token }
+    loc <- H.gets _.locationAfterLogin
+    H.modify _{ token = Just token, userName = Just $ show code, location = loc }
     postInfo "Authenticated."
     H.liftAff do
       Storage.set "user.code" code
@@ -171,16 +178,23 @@ eval = case _ of
   HandleLogin (LoginUI.Failed s) next -> do
     H.modify _{ token = Nothing }
     postAlert s
-    pure next
+    loc <- H.gets _.location
+    eval $ Goto loc next
 
   HandleUsers (UsersUI.Failed s) next -> do
     H.modify _{ token = Nothing }
     postAlert "Failed to access database."
     postAlert "Try login again."
-    pure next
+    loc <- H.gets _.location
+    eval $ Goto loc next
 
   Goto loc next -> do
-    H.modify $ _{ location = loc }
+    token <- H.gets _.token
+    case token of
+      Just _ ->
+        H.modify _{ location = loc, locationAfterLogin = loc }
+      Nothing ->
+        H.modify _{ location = R.Login, locationAfterLogin = loc }
     pure next
 
   where

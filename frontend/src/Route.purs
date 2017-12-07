@@ -8,19 +8,18 @@ import Routing.Match.Class (int, lit)
 
 data Location
   = Home
+  | Login
   | UsersIndex
   | UsersShow Int
 
 oneSlash :: Match Unit
 oneSlash = lit "/"
 
-usersIndex :: Match Location
-usersIndex = UsersIndex <$ oneSlash
-
 routing :: Match Location
-routing = usersShow <|> usersIndex <|> home
+routing = usersShow <|> usersIndex <|> login <|> home
   where
     home = Home <$ lit ""
+    login = Login <$ route "login"
     usersIndex = UsersIndex <$ route "users"
     usersShow = UsersShow <$> (route "users" *> int)
 
@@ -30,5 +29,6 @@ routing = usersShow <|> usersIndex <|> home
 path :: Location -> String
 path = case _ of
   Home -> "#/"
+  Login -> "#/login"
   UsersIndex -> "#/users"
   UsersShow i -> "#/users/" <> show i
