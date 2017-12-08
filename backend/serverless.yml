@@ -13,6 +13,7 @@ provider:
       Resource:
         - "arn:aws:rds-db:${self:provider.region}:*:dbuser:${self:custom.rds.DBI_RESOURCE_ID}/lambda"
   environment:
+    STAGE: ${self:provider.stage}
     AWS_RDS_REGION: ${self:provider.region}
     AWS_RDS_HOST: ${self:custom.rds.HOST}
     AWS_RDS_PORT: ${self:custom.rds.PORT}

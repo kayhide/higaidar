@@ -44,7 +44,13 @@ module.exports.authorize = (event, context, callback) => {
     if (!m) throw new Error('Bad token');
     const token = m[1];
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    callback(null, generatePolicy('user', 'Allow', event.methodArn));
+    const resource = event.methodArn.replace(/\/.*/, `/${process.env.STAGE}/*`);
+    const policy = generatePolicy('user', 'Allow', resource);
+    policy.context = {
+      userId: decoded.id,
+      userName: decoded.name
+    }
+    callback(null, policy);
   }).catch(err => {
     console.log(util.inspect(event, { depth: 5 }));
     console.log(err);
