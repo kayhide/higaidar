@@ -44,3 +44,20 @@
 .notice-pin-on {
     opacity: 1.0;
 }
+
+
+.loading-indicator {
+    transition: 0.5s;
+    -webkit-transition: 0.5s;
+    opacity: 0.0;
+
+    position: absolute;
+    left: 0;
+    width: 100%;
+    z-index: 0;
+}
+
+.loading-indicator._on {
+    opacity: 1.0;
+    z-index: 1000;
+}

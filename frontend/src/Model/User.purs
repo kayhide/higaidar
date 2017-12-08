@@ -12,19 +12,44 @@ import Data.Foreign.Index ((!))
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.JSDate (parse, toDateTime)
+import Data.Lens (Lens', lens)
+import Data.Lens.Record (prop)
 import Data.List.NonEmpty as NEL
 import Data.Maybe (maybe)
+import Data.Symbol (SProxy(..))
 
+type UserId = Int
 
-newtype User =
-  User
-  { id :: Int
-  , code :: Int
-  , tel :: String
-  , name :: String
-  , created_at :: DateTime
-  , updated_at :: DateTime
-  }
+type UserRec
+  = { id :: UserId
+    , code :: Int
+    , tel :: String
+    , name :: String
+    , created_at :: DateTime
+    , updated_at :: DateTime
+    }
+newtype User = User UserRec
+
+_User :: Lens' User UserRec
+_User = lens (\(User r) -> r) (\_ r -> User r)
+
+_id :: Lens' User UserId
+_id = _User <<< prop (SProxy :: SProxy "id")
+
+_code :: Lens' User Int
+_code = _User <<< prop (SProxy :: SProxy "code")
+
+_tel :: Lens' User String
+_tel = _User <<< prop (SProxy :: SProxy "tel")
+
+_name :: Lens' User String
+_name = _User <<< prop (SProxy :: SProxy "name")
+
+_created_at :: Lens' User DateTime
+_created_at = _User <<< prop (SProxy :: SProxy "created_at")
+
+_updated_at :: Lens' User DateTime
+_updated_at = _User <<< prop (SProxy :: SProxy "updated_at")
 
 
 derive instance genericPhoto :: Generic User _

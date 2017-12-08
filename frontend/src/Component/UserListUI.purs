@@ -1,9 +1,10 @@
-module Component.UsersUI where
+module Component.UserListUI where
 
 import Prelude
 
 import Api.Token (AuthenticationToken)
 import Api.Users as Users
+import Component.HTML.LoadingIndicator as LoadingIndicator
 import Control.Monad.Aff (Aff, attempt)
 import Control.Monad.Except (ExceptT, lift, runExceptT, throwError)
 import Data.DateTime as DateTime
@@ -20,8 +21,8 @@ import Route as R
 
 
 data Slot = Slot
-derive instance eqUsersSlot :: Eq Slot
-derive instance ordUsersSlot :: Ord Slot
+derive instance eqSlot :: Eq Slot
+derive instance ordSlot :: Ord Slot
 
 
 data Query a
@@ -77,11 +78,11 @@ render state =
   [
     HH.h1_
     [ HH.text "User List" ]
+  , LoadingIndicator.render state.busy
   , HH.div
     [ HP.class_ $ H.ClassName "row" ]
     (renderItem <$> state.items)
   , HH.div_ (renderAlert <$> state.alerts)
-  , renderBusy state.busy
   ]
 
   where
@@ -89,24 +90,16 @@ render state =
       HH.pre_
       [ HH.text s ]
 
-    renderBusy false = HH.p_ []
-    renderBusy true =
-      HH.p
-      [ HP.class_ $ H.ClassName "text-center" ]
-      [
-        HH.i [ HP.class_ $ H.ClassName "fa fa-spinner fa-pulse fa-3x" ] []
-      ]
-
     renderItem (User { id, code, tel, name, created_at }) =
       HH.div
-      [ HP.classes [ H.ClassName "col-md-12" ] ]
+      [ HP.class_ $ H.ClassName "col-md-12" ]
       [ HH.div
-        [ HP.classes [ H.ClassName "card", H.ClassName "mb-2" ] ]
+        [ HP.class_ $ H.ClassName "card mb-2" ]
         [
           HH.div
-          [ HP.classes [ H.ClassName "card-body" ] ]
+          [ HP.class_ $ H.ClassName "card-body" ]
           [ HH.p
-            [ HP.classes [ H.ClassName "card-text small" ] ]
+            [ HP.class_ $ H.ClassName "card-text small" ]
             [
               HH.i
               [ HP.class_ $ H.ClassName "fa fa-user mr-2"
@@ -119,12 +112,12 @@ render state =
               ]
             ]
           -- , HH.p
-          --   [ HP.classes [ H.ClassName "card-text small" ] ]
+          --   [ HP.class_ [ H.ClassName "card-text small" ] ]
           --   [
           --     HH.text $ created_at
           --   ]
           , HH.p
-            [ HP.classes [ H.ClassName "card-text", H.ClassName "text-muted", H.ClassName "small" ] ]
+            [ HP.class_ $ H.ClassName "card-text text-muted small" ]
             [ renderDateTime created_at state.locale ]
           ]
         ]

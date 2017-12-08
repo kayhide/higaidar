@@ -9,7 +9,7 @@ import Data.Either (Either(Left, Right))
 import Data.Foreign.Class (class Decode)
 import Data.Foreign.Generic (decodeJSON, defaultOptions, genericDecode)
 import Data.Generic.Rep (class Generic)
-import Model.User (Users)
+import Model.User (User(..), UserId, Users)
 import Network.HTTP.Affjax (AJAX, URL, affjax, defaultRequest)
 import Network.HTTP.RequestHeader (RequestHeader(..))
 
@@ -38,6 +38,24 @@ index baseUrl token = do
 
     get' = affjax $ defaultRequest { url = url, headers = headers }
 
+    headers = [
+      RequestHeader "Authorization" $ "Bearer " <> token
+    ]
+
+find :: forall eff. URL -> AuthenticationToken -> UserId -> Aff (ajax :: AJAX | eff) User
+find baseUrl token userId = do
+  res <- get'
+  case (runExcept $ decodeJSON res.response) of
+    Right user -> pure user
+    Left _ -> do
+      case (runExcept $ decodeJSON res.response) of
+        Right (ResponseNg ng) -> throwError $ error ng.message
+        Left err -> throwError <<< error $ res.response <> show err
+
+  where
+    get' = affjax $ defaultRequest { url = url, headers = headers }
+
+    url = baseUrl <> "/users/" <> show userId
     headers = [
       RequestHeader "Authorization" $ "Bearer " <> token
     ]

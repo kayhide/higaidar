@@ -5,14 +5,15 @@ import Prelude
 import Api.Token (AuthenticationToken)
 import Component.LoginUI as LoginUI
 import Component.NoticeUI as NoticeUI
-import Component.UsersUI as UsersUI
+import Component.UserShowUI as UserShowUI
+import Component.UserListUI as UserListUI
 import Control.Monad.Aff (Aff, launchAff_)
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Now (NOW)
 import Control.Monad.Eff.Now as Now
 import Data.DateTime.Locale (Locale(..), LocaleName(..))
-import Data.Either.Nested (Either3)
-import Data.Functor.Coproduct.Nested (Coproduct3)
+import Data.Either.Nested (Either3, Either4)
+import Data.Functor.Coproduct.Nested (Coproduct3, Coproduct4)
 import Data.Maybe (Maybe(Nothing, Just), maybe)
 import Data.Time.Duration (Minutes(..))
 import Dom.Storage (STORAGE)
@@ -37,7 +38,8 @@ data Query a
   = Initialize a
   | HandleNotice NoticeUI.Message a
   | HandleLogin LoginUI.Message a
-  | HandleUsers UsersUI.Message a
+  | HandleUserList UserListUI.Message a
+  | HandleUserShow UserShowUI.Message a
   | Goto R.Location a
 
 type State =
@@ -53,8 +55,8 @@ type Input = AppConfig
 
 type Message = Void
 
-type ChildQuery = Coproduct3 NoticeUI.Query LoginUI.Query UsersUI.Query
-type ChildSlot = Either3 NoticeUI.Slot LoginUI.Slot UsersUI.Slot
+type ChildQuery = Coproduct4 NoticeUI.Query LoginUI.Query UserListUI.Query UserShowUI.Query
+type ChildSlot = Either4 NoticeUI.Slot LoginUI.Slot UserListUI.Slot UserShowUI.Slot
 
 cpNotice :: CP.ChildPath NoticeUI.Query ChildQuery NoticeUI.Slot ChildSlot
 cpNotice = CP.cp1
@@ -62,8 +64,11 @@ cpNotice = CP.cp1
 cpLogin :: CP.ChildPath LoginUI.Query ChildQuery LoginUI.Slot ChildSlot
 cpLogin = CP.cp2
 
-cpUsers :: CP.ChildPath UsersUI.Query ChildQuery UsersUI.Slot ChildSlot
-cpUsers = CP.cp3
+cpUserList :: CP.ChildPath UserListUI.Query ChildQuery UserListUI.Slot ChildSlot
+cpUserList = CP.cp3
+
+cpUserShow :: CP.ChildPath UserShowUI.Query ChildQuery UserShowUI.Slot ChildSlot
+cpUserShow = CP.cp4
 
 type Eff_ eff = Aff (ajax :: AJAX, now :: NOW, storage :: STORAGE | eff)
 
@@ -141,20 +146,19 @@ render state =
       Nothing -> HH.span_ []
 
     renderPage = case _ of
-      R.Home ->
+      R.Home -> withAuthentication \token ->
         HH.p_ [ HH.text $ "Home" ]
 
       R.Login ->
         HH.slot' cpLogin LoginUI.Slot LoginUI.ui { baseUrl } $ HE.input HandleLogin
 
-      R.UsersIndex -> case state.token of
-        Just token ->
-          HH.slot' cpUsers UsersUI.Slot UsersUI.ui { baseUrl, token, locale } $ HE.input HandleUsers
-        Nothing ->
-          HH.text $ "Not authenticated"
+      R.UsersIndex -> withAuthentication \token ->
+        HH.slot' cpUserList UserListUI.Slot UserListUI.ui { baseUrl, token, locale } $ HE.input HandleUserList
 
-      R.UsersShow i ->
-        HH.p_ [ HH.text $ "User " <> show i ]
+      R.UsersShow userId -> withAuthentication \token ->
+        HH.slot' cpUserShow UserShowUI.Slot UserShowUI.ui { userId, baseUrl, token, locale } $ HE.input HandleUserShow
+
+    withAuthentication html = maybe (HH.text $ "Not authenticated") html state.token
 
 eval :: forall eff. Query ~> H.ParentDSL State Query ChildQuery ChildSlot Message (Eff_ eff)
 eval = case _ of
@@ -176,17 +180,24 @@ eval = case _ of
     pure next
 
   HandleLogin (LoginUI.Failed s) next -> do
-    H.modify _{ token = Nothing }
+    H.modify _{ token = Nothing, userName = Nothing }
     postAlert s
-    loc <- H.gets _.location
-    eval $ Goto loc next
+    pure next
 
-  HandleUsers (UsersUI.Failed s) next -> do
-    H.modify _{ token = Nothing }
-    postAlert "Failed to access database."
+  HandleUserList (UserListUI.Failed s) next -> do
+    H.modify _{ token = Nothing, userName = Nothing }
+    postAlert "Failed to access resource."
     postAlert "Try login again."
-    loc <- H.gets _.location
-    eval $ Goto loc next
+    pure next
+
+  HandleUserShow (UserShowUI.Failed s) next -> do
+    postAlert "Failed to access resource."
+    pure next
+    -- H.modify _{ token = Nothing, userName = Nothing }
+    -- postAlert "Failed to access database."
+    -- postAlert "Try login again."
+    -- loc <- H.gets _.location
+    -- eval $ Goto loc next
 
   Goto loc next -> do
     token <- H.gets _.token
