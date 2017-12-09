@@ -5,6 +5,7 @@ import Prelude
 import Api.Token (AuthenticationToken)
 import Api.Users as Users
 import Component.HTML.LoadingIndicator as LoadingIndicator
+import Component.HTML.TextField as TextField
 import Control.Monad.Aff (Aff, attempt)
 import Control.Monad.Except (ExceptT, lift, runExceptT, throwError)
 import Data.DateTime as DateTime
@@ -12,11 +13,10 @@ import Data.DateTime.Locale (Locale(Locale))
 import Data.Either (Either(..), either)
 import Data.Formatter.DateTime (formatDateTime)
 import Data.Int (fromString)
-import Data.Lens (Lens, Lens', _Just, assign, lens, set, to, view, (^.))
+import Data.Lens (Lens', _Just, assign, lens, set, view, (^.))
 import Data.Lens.Record (prop)
-import Data.Maybe (Maybe(..), fromMaybe, maybe)
+import Data.Maybe (Maybe(Just, Nothing), maybe)
 import Data.Symbol (SProxy(..))
-import Halogen (Action)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
@@ -51,6 +51,7 @@ type State =
 
 _editing :: Lens' State (Maybe User)
 _editing = prop (SProxy :: SProxy "editing")
+
 
 type Input =
   { userId :: Int
@@ -93,7 +94,7 @@ render state =
   , LoadingIndicator.render state.busy
   , HH.div
     [ HP.class_ $ H.ClassName "row" ]
-    $ maybe [] (pure <<< renderForm) state.editing
+    [ renderForm ]
   , HH.div
     [ HP.class_ $ H.ClassName "row" ]
     $ maybe [] (pure <<< renderItem) state.editing
@@ -101,21 +102,24 @@ render state =
   ]
 
   where
-    _String_Int :: Lens' String Int
-    _String_Int = lens (\s -> fromMaybe 0 $ fromString s) (\_ i -> show i)
+    _User_code :: Lens' User String
+    _User_code = lens
+                 (show <<< view User._code)
+                 (\s -> maybe s (flip (set User._code) s) <<< fromString)
 
-    _Int_String :: Lens' Int String
-    _Int_String = lens show (\_ s -> fromMaybe 0 $ fromString s)
-
-    renderForm (User { id, code, tel, name, created_at }) =
+    renderForm =
       HH.form
       [ HP.class_ $ H.ClassName "col-md-12 mb-4" ]
       [
-        renderInput "user-code" "Code" (User._code <<< _Int_String) (SetAttr (User._code <<< _Int_String))
-      , renderInput "user-name" "Name" (User._name) (SetAttr User._name)
-      , renderInput "user-tel" "Tel" (User._tel) (SetAttr User._tel)
+        renderInput "user-code" "Code" _User_code
+      , renderInput "user-name" "Name" User._name
+      , renderInput "user-tel" "Tel" User._tel
       , renderSubmitButton
       ]
+
+    renderInput :: String -> String -> Lens' User String -> H.ComponentHTML Query
+    renderInput key label attr =
+      TextField.render key label (state.editing ^. _Just <<< attr) $ SetAttr attr
 
     renderSubmitButton =
       HH.button
@@ -162,29 +166,6 @@ render state =
         ]
       ]
 
-    renderInput :: forall a q.
-                   String
-                   -> String
-                   -> Lens' User String
-                   -> (String -> Action q)
-                   -> H.ComponentHTML q
-    renderInput key label attr query =
-      HH.div
-      [ HP.class_ $ H.ClassName "form-group" ]
-      [
-        HH.label
-        [ HP.for key ]
-        [
-          HH.text label
-        ]
-      , HH.input
-        [ HP.class_ $ H.ClassName "form-control mr-2"
-        , HP.id_ key
-        , HP.value $ state.editing ^. (_Just <<< attr)
-        , HE.onValueInput $ HE.input query
-        ]
-      ]
-
     renderDateTime dt (Locale _ dur) =
       HH.text $ either id id $ maybe (Left "") (formatDateTime "YYYY/MM/DD HH:mm:ss") dt_
       where
@@ -207,7 +188,8 @@ eval = case _ of
       token <- H.gets _.token
       userId <- H.gets _.userId
       res <- runExceptT do
-        user <- onLeft "Failed to access api" =<< (H.liftAff $ attempt $ Users.find url token userId)
+        user <- onLeft "Failed to access api"
+                =<< (H.liftAff $ attempt $ Users.find url token userId)
         lift do
           H.modify _{ user = Just user, editing = Just user }
 
