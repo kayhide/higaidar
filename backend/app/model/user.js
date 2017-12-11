@@ -3,7 +3,7 @@
 const Sequelize = require('sequelize');
 
 module.exports.define = (sequelize) => {
-  return sequelize.define('user', {
+  const def = sequelize.define('user', {
     code: { type: Sequelize.INTEGER, allowNull: false, unique: true },
     name: { type: Sequelize.STRING },
     tel: { type: Sequelize.STRING }
@@ -12,4 +12,6 @@ module.exports.define = (sequelize) => {
     createdAt: 'created_at',
     updatedAt: 'updated_at'
   });
+
+  return def;
 };
