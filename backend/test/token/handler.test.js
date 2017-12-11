@@ -45,7 +45,11 @@ describe('#create', () => {
         const res = yield handle(event, {});
         assert(res.statusCode === 200);
 
-        const token = JSON.parse(res.body).token;
+        const body = JSON.parse(res.body);
+        const user_ = body.user;
+        assert(helper.isEqualModel(user_, user));
+
+        const token = body.token;
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
         assert(helper.isEqualModel(decoded.user, user));
       });
@@ -96,7 +100,7 @@ describe('#authorize', () => {
       { expiresIn: process.env.JWT_EXPIRES_IN }
     )
     event = {};
-    event.methodArn = 'arn:aws:execute-api:ap-northheast-1::api-id/test/GET/something';
+    event.methodArn = 'arn:aws:execute-api:ap-northheast-1::api-id/test/*';
     event.authorizationToken = `Bearer ${token}`;
   }));
 

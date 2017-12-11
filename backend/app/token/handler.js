@@ -24,13 +24,14 @@ module.exports.create = (event, context, callback) => {
     const data = yield model.with(['user'], (User) => {
       return User.findOne({ where }).then(verify.authention);
     });
+    const user = data.dataValues;
     const token = jwt.sign(
-      { user: data.dataValues },
+      { user },
       process.env.JWT_SECRET,
       { expiresIn: process.env.JWT_EXPIRES_IN }
     );
 
-    handleSuccess(callback)({ token });
+    handleSuccess(callback)({ token, user });
 
   }).catch(handleError(callback));
 };
