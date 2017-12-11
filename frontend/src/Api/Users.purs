@@ -22,8 +22,15 @@ find cli userId = Api.get cli path
 
 create :: forall eff. Client -> UserEntity -> Aff (ajax :: AJAX | eff) User
 create cli user = Api.post cli path user
-  where path = "/users"
+  where
+    path = "/users"
 
 update :: forall eff. Client -> User -> Aff (ajax :: AJAX | eff) User
 update cli user = Api.patch cli path user
-  where path = "/users/" <> show (user ^. _id)
+  where
+    path = "/users/" <> show (user ^. _id)
+
+destroy :: forall eff. Client -> UserId -> Aff (ajax :: AJAX | eff) Unit
+destroy cli userId = Api.delete cli path
+  where
+    path = "/users/" <> show userId

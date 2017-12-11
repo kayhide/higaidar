@@ -7,13 +7,14 @@ import Api.Users as Users
 import Component.HTML.LoadingIndicator as LoadingIndicator
 import Control.Monad.Aff (Aff, attempt)
 import Control.Monad.Aff.Class (class MonadAff)
-import Control.Monad.Except (ExceptT, lift, runExceptT, throwError)
+import Control.Monad.Except (ExceptT, throwError)
 import Control.Monad.State (class MonadState)
-import Data.Array (mapMaybe, (!!))
+import Data.Array ((!!))
 import Data.Array as Array
 import Data.DateTime.Locale (Locale)
-import Data.Either (Either(..), either, hush)
+import Data.Either (Either(Left, Right), either)
 import Data.Int as Int
+import Data.Lens (view)
 import Data.Maybe (Maybe(Nothing, Just), maybe)
 import Data.String (Pattern(..))
 import Data.String as String
@@ -23,7 +24,8 @@ import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import I18n as I18n
-import Model.User (User(..), UserEntity(..), Users)
+import Model.User (User(..), UserEntity(..), Users, UserId)
+import Model.User as User
 import Network.HTTP.Affjax (AJAX)
 import Route as R
 
@@ -38,7 +40,8 @@ data Query a
   | SetLocale Locale a
   | Reload a
   | SetPopulating String a
-  | Submit a
+  | Populate a
+  | Destroy UserId a
 
 type State =
   { items :: Users
@@ -111,6 +114,8 @@ render state =
         [ HH.text "Tel" ]
       , HH.td_
         [ HH.text "Created at" ]
+      , HH.td_
+        []
       ]
 
     renderItem (User { id, code, tel, name, created_at }) =
@@ -119,8 +124,8 @@ render state =
         HH.td_
         [
           HH.a
-           [ HP.href $ R.path $ R.UsersShow id ]
-           [ HH.text name ]
+          [ HP.href $ R.path $ R.UsersShow id ]
+          [ HH.text name ]
         ]
       , HH.td_
         [ HH.text $ show code ]
@@ -128,6 +133,16 @@ render state =
         [ HH.text tel ]
       , HH.td_
         [ HH.text $ I18n.localizeDateTime state.locale created_at ]
+      , HH.dt_
+        [
+          HH.button
+          [ HP.class_ $ H.ClassName "btn btn-outline-danger btn-sm"
+          , HE.onClick $ HE.input_ $ Destroy id
+          ]
+          [
+            HH.i [ HP.class_ $ H.ClassName "fa fa-times" ] []
+          ]
+        ]
       ]
 
     renderForm =
@@ -149,7 +164,7 @@ render state =
     renderSubmitButton =
       HH.button
       [ HP.class_ $ H.ClassName "btn btn-success"
-      , HE.onClick $ HE.input_ Submit
+      , HE.onClick $ HE.input_ Populate
       ]
       [
         HH.i [ HP.class_ $ H.ClassName "fa fa-plus mr-2" ] []
@@ -178,14 +193,14 @@ eval = case _ of
         Left _ ->
           H.raise $ Failed "Failed to access api."
 
-    H.modify _{ busy = false }
+      H.modify _{ busy = false }
     pure next
 
   SetPopulating s next -> do
     H.modify _{ populating = s}
     pure next
 
-  Submit next -> do
+  Populate next -> do
     busy <- H.gets _.busy
     when (not busy) do
       H.modify _{ invalids = [] }
@@ -200,7 +215,24 @@ eval = case _ of
       when (not $ Array.null invalids) do
         H.raise $ Failed "Failed to create some users."
 
-    H.modify _{ busy = false }
+      H.modify _{ busy = false }
+    pure next
+
+  Destroy userId next -> do
+    busy <- H.gets _.busy
+    when (not busy) do
+      H.modify _{ busy = true }
+      cli <- H.gets _.client
+      res <- H.liftAff $ attempt $ Users.destroy cli userId
+
+      case res of
+        Right _ -> do
+          items <- Array.filter ((userId /= _) <<< view User._id) <$> H.gets _.items
+          H.modify _{ items = items }
+        Left _ ->
+          H.raise $ Failed "Failed to delete user."
+
+      H.modify _{ busy = false }
     pure next
 
 onLeft :: forall e m. Monad m => String -> Either e ~> ExceptT String m

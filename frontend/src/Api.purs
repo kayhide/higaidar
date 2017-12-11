@@ -13,6 +13,7 @@ import Data.HTTP.Method (Method(..))
 import Data.Lens (Lens', lens, (^.))
 import Data.Maybe (Maybe(..), maybe)
 import Data.Newtype (class Newtype, unwrap, wrap)
+import Data.String as String
 import Model.User (User)
 import Network.HTTP.Affjax (AJAX, AffjaxRequest, AffjaxResponse, URL)
 import Network.HTTP.Affjax as Affjax
@@ -78,6 +79,11 @@ patch :: forall eff a b. Encode a => Decode b => Client -> String -> a -> Aff (a
 patch cli path x
   = buildPatch cli path x >>= Affjax.affjax >>= handle
 
+delete :: forall eff. Client -> String -> Aff (ajax :: AJAX | eff) Unit
+delete cli path
+  = buildDelete cli path >>= Affjax.affjax >>= handle_
+
+
 verifyToken :: forall eff. Client -> Aff eff AuthenticationToken
 verifyToken (Client cli) = maybe throw_ pure cli.token
   where
@@ -100,6 +106,11 @@ buildPatch cli path x = do
   req <- buildPost cli path x
   pure $ req { method = Left PATCH }
 
+buildDelete :: forall eff. Client -> String -> Aff eff (AffjaxRequest Unit)
+buildDelete cli path = do
+  req <- buildGet cli path
+  pure $ req { method = Left DELETE }
+
 
 newtype ResponseNg
   = ResponseNg
@@ -115,6 +126,12 @@ handle res = do
   case (runExcept $ decodeJSON res.response) of
     Right x -> pure x
     Left _ -> handleError res.response
+
+handle_ :: forall eff. AffjaxResponse String -> Aff eff Unit
+handle_ res = do
+  case String.null res.response of
+    true -> pure unit
+    false -> handleError res.response
 
 handleError :: forall eff a. String -> Aff eff a
 handleError body =
