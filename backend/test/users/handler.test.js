@@ -44,7 +44,23 @@ describe('#index', () => {
         assert(res.statusCode === 200);
 
         const body = JSON.parse(res.body);
-        assert(_.isEqualWith(body, users.map(x => x.dataValues), (x, y) => x.id === y.id));
+        assert(helper.isEqualModel(body[0], users[0]));
+        assert(helper.isEqualModel(body[1], users[1]));
+      });
+    });
+
+    it('orders by code', () => {
+      return co(function *() {
+        const user1 = yield factory.create(User, { code: 5 });
+        const user2 = yield factory.create(User, { code: 2 });
+        const users = [user2, user1];
+
+        const res = yield handle(event, {})
+        assert(res.statusCode === 200);
+
+        const body = JSON.parse(res.body);
+        assert(helper.isEqualModel(body[0], users[0]));
+        assert(helper.isEqualModel(body[1], users[1]));
       });
     });
   });

@@ -15,7 +15,7 @@ module.exports.index = (event, context, callback) => {
 
   co(function *() {
     const data = yield model.with(['user'], (User) => {
-      return User.findAll();
+      return User.findAll({ order: [['code', 'ASC']] });
     });
 
     const users = data.map(u => u.dataValues);
