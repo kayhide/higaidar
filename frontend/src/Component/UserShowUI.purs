@@ -203,6 +203,26 @@ eval = case _ of
     pure next
 
   Submit next -> do
+    busy <- H.gets _.busy
+    editing <- H.gets _.editing
+    case editing of
+      Just editing_ ->
+        when (not busy) do
+          H.modify _{ busy = true }
+          url <- H.gets _.baseUrl
+          token <- H.gets _.token
+          userId <- H.gets _.userId
+          res <- runExceptT do
+            user <- onLeft "Failed to access api"
+                    =<< (H.liftAff $ attempt $ Users.update url token editing_)
+            lift do
+              H.modify _{ user = Just user, editing = Just user }
+
+          either (H.raise <<< Failed) pure res
+
+      Nothing -> pure unit
+
+    H.modify _{ busy = false }
     pure next
 
 onLeft :: forall e m. Monad m => String -> Either e ~> ExceptT String m

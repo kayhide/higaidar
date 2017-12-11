@@ -6,10 +6,13 @@ import Api.Token (AuthenticationToken)
 import Control.Monad.Aff (Aff, error, throwError)
 import Control.Monad.Except (runExcept)
 import Data.Either (Either(Left, Right))
-import Data.Foreign.Class (class Decode)
-import Data.Foreign.Generic (decodeJSON, defaultOptions, genericDecode)
+import Data.Foreign.Class (class Decode, encode)
+import Data.Foreign.Generic (decodeJSON, defaultOptions, encodeJSON, genericDecode)
 import Data.Generic.Rep (class Generic)
-import Model.User (User(..), UserId, Users)
+import Data.HTTP.Method (Method(..))
+import Data.Lens ((^.))
+import Data.Maybe (Maybe(..))
+import Model.User (User(..), UserId, Users, _id)
 import Network.HTTP.Affjax (AJAX, URL, affjax, defaultRequest)
 import Network.HTTP.RequestHeader (RequestHeader(..))
 
@@ -56,6 +59,27 @@ find baseUrl token userId = do
     get' = affjax $ defaultRequest { url = url, headers = headers }
 
     url = baseUrl <> "/users/" <> show userId
+    headers = [
+      RequestHeader "Authorization" $ "Bearer " <> token
+    ]
+
+update :: forall eff. URL -> AuthenticationToken -> User -> Aff (ajax :: AJAX | eff) User
+update baseUrl token user = do
+  res <- patch'
+  case (runExcept $ decodeJSON res.response) of
+    Right user -> pure user
+    Left _ -> do
+      case (runExcept $ decodeJSON res.response) of
+        Right (ResponseNg ng) -> throwError $ error ng.message
+        Left err -> throwError <<< error $ res.response <> show err
+
+  where
+    patch' = affjax $ defaultRequest { method = Left PATCH
+                                     , url = url
+                                     , headers = headers
+                                     , content = Just $ encodeJSON user }
+
+    url = baseUrl <> "/users/" <> show (user ^. _id)
     headers = [
       RequestHeader "Authorization" $ "Bearer " <> token
     ]

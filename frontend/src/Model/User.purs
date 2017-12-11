@@ -6,13 +6,13 @@ import Control.Monad.Eff.Unsafe (unsafePerformEff)
 import Control.Monad.Except (mapExcept)
 import Data.DateTime (DateTime)
 import Data.Either (Either(..), either)
-import Data.Foreign (F, Foreign, ForeignError(TypeMismatch), readString, tagOf)
-import Data.Foreign.Class (class Decode, decode)
+import Data.Foreign (F, Foreign, ForeignError(TypeMismatch), readString, tagOf, toForeign)
+import Data.Foreign.Class (class Decode, class Encode, decode, encode)
 import Data.Foreign.Index ((!))
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.JSDate (parse, toDateTime)
-import Data.Lens (Lens', lens)
+import Data.Lens (Lens', lens, (^.))
 import Data.Lens.Record (prop)
 import Data.List.NonEmpty as NEL
 import Data.Maybe (maybe)
@@ -52,11 +52,11 @@ _updated_at :: Lens' User DateTime
 _updated_at = _User <<< prop (SProxy :: SProxy "updated_at")
 
 
-derive instance genericPhoto :: Generic User _
-instance showPhoto :: Show User where
+derive instance genericUser :: Generic User _
+instance showUser :: Show User where
   show = genericShow
 
-instance decodePhoto :: Decode User where
+instance decodeUser :: Decode User where
   decode v = do
     id <- decode =<< v ! "id"
     code <- decode =<< v ! "code"
@@ -65,6 +65,13 @@ instance decodePhoto :: Decode User where
     created_at <- readDateTime =<< v ! "created_at"
     updated_at <- readDateTime =<< v ! "updated_at"
     pure $ User { id, code, tel, name, created_at, updated_at }
+
+instance encodeUser :: Encode User where
+  encode v = toForeign { code, tel, name }
+    where
+      code = v ^. _code
+      tel = v ^. _tel
+      name = v ^. _name
 
 
 type Users = Array User
