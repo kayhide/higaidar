@@ -15,6 +15,7 @@ import Data.Maybe (Maybe(..), maybe)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Properties as HP
+import I18n as I18n
 import Model.User (User(..), Users)
 import Network.HTTP.Affjax (AJAX, URL)
 import Route as R
@@ -35,7 +36,6 @@ type State =
   , baseUrl :: URL
   , token :: AuthenticationToken
   , locale :: Locale
-  , alerts :: Array String
   , busy :: Boolean
   }
 
@@ -68,7 +68,6 @@ initialState { locale, token, baseUrl } =
     , baseUrl
     , token
     , locale
-    , alerts: []
     , busy: false
     }
 
@@ -79,54 +78,46 @@ render state =
     HH.h1_
     [ HH.text "User List" ]
   , LoadingIndicator.render state.busy
-  , HH.div
-    [ HP.class_ $ H.ClassName "row" ]
-    (renderItem <$> state.items)
-  , HH.div_ (renderAlert <$> state.alerts)
+  , HH.table
+    [ HP.class_ $ H.ClassName "table table-striped table-bordered table-hover table-sm" ]
+    [
+      HH.thead_
+      [ renderHeader ]
+    , HH.tbody_
+      $ renderItem <$> state.items
+    ]
   ]
 
   where
-    renderAlert s =
-      HH.pre_
-      [ HH.text s ]
-
-    renderItem (User { id, code, tel, name, created_at }) =
-      HH.div
-      [ HP.class_ $ H.ClassName "col-md-12" ]
-      [ HH.div
-        [ HP.class_ $ H.ClassName "card mb-2" ]
-        [
-          HH.div
-          [ HP.class_ $ H.ClassName "card-body" ]
-          [ HH.p
-            [ HP.class_ $ H.ClassName "card-text small" ]
-            [
-              HH.i
-              [ HP.class_ $ H.ClassName "fa fa-user mr-2"
-              , HP.title name
-              ] []
-            , HH.a
-              [ HP.href $ R.path $ R.UsersShow id ]
-              [
-                HH.text name
-              ]
-            ]
-          -- , HH.p
-          --   [ HP.class_ [ H.ClassName "card-text small" ] ]
-          --   [
-          --     HH.text $ created_at
-          --   ]
-          , HH.p
-            [ HP.class_ $ H.ClassName "card-text text-muted small" ]
-            [ renderDateTime created_at state.locale ]
-          ]
-        ]
+    renderHeader =
+      HH.tr_
+      [
+        HH.td_
+        [ HH.text "Name" ]
+      , HH.td_
+        [ HH.text "Code" ]
+      , HH.td_
+        [ HH.text "Tel" ]
+      , HH.td_
+        [ HH.text "Created at" ]
       ]
 
-    renderDateTime dt (Locale _ dur) =
-      HH.text $ either id id $ maybe (Left "") (formatDateTime "YYYY/MM/DD HH:mm:ss") dt_
-      where
-        dt_ = (DateTime.adjust (negate dur)) dt
+    renderItem (User { id, code, tel, name, created_at }) =
+      HH.tr_
+      [
+        HH.td_
+        [
+          HH.a
+           [ HP.href $ R.path $ R.UsersShow id ]
+           [ HH.text name ]
+        ]
+      , HH.td_
+        [ HH.text $ show code ]
+      , HH.td_
+        [ HH.text tel ]
+      , HH.td_
+        [ HH.text $ I18n.localizeDateTime state.locale created_at ]
+      ]
 
 eval :: forall eff. Query ~> H.ComponentDSL State Query Message (Eff_ eff)
 eval = case _ of

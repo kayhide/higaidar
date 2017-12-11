@@ -8,10 +8,8 @@ import Component.HTML.LoadingIndicator as LoadingIndicator
 import Component.HTML.TextField as TextField
 import Control.Monad.Aff (Aff, attempt)
 import Control.Monad.Except (ExceptT, lift, runExceptT, throwError)
-import Data.DateTime as DateTime
-import Data.DateTime.Locale (Locale(Locale))
-import Data.Either (Either(..), either)
-import Data.Formatter.DateTime (formatDateTime)
+import Data.DateTime.Locale (Locale)
+import Data.Either (Either, either)
 import Data.Int (fromString)
 import Data.Lens (Lens', _Just, assign, lens, set, view, (^.))
 import Data.Lens.Record (prop)
@@ -21,6 +19,7 @@ import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
+import I18n as I18n
 import Model.User (User(User))
 import Model.User as User
 import Network.HTTP.Affjax (AJAX, URL)
@@ -141,14 +140,10 @@ render state =
             [ HP.class_ $ H.ClassName "card-text small" ]
             [
               HH.i
-              [ HP.class_ $ H.ClassName "fa fa-user mr-2"
-              , HP.title name
-              ] []
+              [ HP.class_ $ H.ClassName "fa fa-user mr-2" ] []
             , HH.a
               [ HP.href $ R.path $ R.UsersShow id ]
-              [
-                HH.text name
-              ]
+              [ HH.text name ]
             ]
           , HH.div
             [ HP.class_ $ H.ClassName "card-text small" ]
@@ -158,18 +153,13 @@ render state =
             [ HH.text $ tel ]
           , HH.div
             [ HP.class_ $ H.ClassName "card-text text-muted small" ]
-            [ renderDateTime created_at state.locale ]
+            [ HH.text $ I18n.localizeDateTime state.locale created_at ]
           , HH.div
             [ HP.class_ $ H.ClassName "card-text text-muted small" ]
-            [ renderDateTime updated_at state.locale ]
+            [ HH.text $ I18n.localizeDateTime state.locale updated_at ]
           ]
         ]
       ]
-
-    renderDateTime dt (Locale _ dur) =
-      HH.text $ either id id $ maybe (Left "") (formatDateTime "YYYY/MM/DD HH:mm:ss") dt_
-      where
-        dt_ = (DateTime.adjust (negate dur)) dt
 
 eval :: forall eff. Query ~> H.ComponentDSL State Query Message (Eff_ eff)
 eval = case _ of
