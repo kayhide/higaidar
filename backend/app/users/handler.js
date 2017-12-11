@@ -1,5 +1,6 @@
 'use strict';
 
+const _ = require('lodash');
 const co = require('co');
 const util = require('util');
 
@@ -14,12 +15,17 @@ module.exports.index = (event, context, callback) => {
   context.callbackWaitsForEmptyEventLoop = false;
 
   co(function *() {
-    const data = yield model.with(['user'], (User) => {
-      return User.findAll({ order: [['code', 'ASC']] });
-    });
+    const { offset, limit } = Object.assign(
+      { offset: 0, limit: 50 },
+      _.pick(event.queryStringParameters, 'offset', 'limit'));
+    const { data, total } = yield model.with(['user'], (User) => co(function *() {
+      const data = yield User.findAll({ order: [['code', 'ASC']], offset, limit });
+      const total = yield User.count();
+      return { data, total }
+    }));
 
     const users = data.map(u => u.dataValues);
-    handleSuccess(callback)(users);
+    handleSuccess(callback)(users, { offset, limit, total });
 
   }).catch(handleError(callback));
 };

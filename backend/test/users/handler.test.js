@@ -63,6 +63,33 @@ describe('#index', () => {
         assert(helper.isEqualModel(body[1], users[1]));
       });
     });
+
+    it('returns content range', () => {
+      return co(function *() {
+        const users = yield factory.createList(User, 7);
+        const res = yield handle(event, {})
+        assert(res.headers['Content-Range'] === '0-6/7');
+      });
+    });
+  });
+
+  context('with paging params', () => {
+    it('offsets and limits', () => {
+      return co(function *() {
+        event.queryStringParameters = {
+          offset: 2,
+          limit: 3
+        };
+        const users = yield factory.createList(User, 7);
+        const res = yield handle(event, {})
+        assert(res.headers['Content-Range'] === '2-4/7');
+
+        const body = JSON.parse(res.body);
+        assert(body.length === 3);
+        assert(helper.isEqualModel(body[0], users[2]));
+        assert(helper.isEqualModel(body[2], users[4]));
+      });
+    });
   });
 });
 
