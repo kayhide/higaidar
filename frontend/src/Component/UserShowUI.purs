@@ -2,7 +2,7 @@ module Component.UserShowUI where
 
 import Prelude
 
-import Api.Token (AuthenticationToken)
+import Api as Api
 import Api.Users as Users
 import Component.HTML.LoadingIndicator as LoadingIndicator
 import Component.HTML.TextField as TextField
@@ -22,7 +22,7 @@ import Halogen.HTML.Properties as HP
 import I18n as I18n
 import Model.User (User(User))
 import Model.User as User
-import Network.HTTP.Affjax (AJAX, URL)
+import Network.HTTP.Affjax (AJAX)
 import Route as R
 
 
@@ -42,8 +42,7 @@ type State =
   { userId :: Int
   , user :: Maybe User
   , editing :: Maybe User
-  , baseUrl :: URL
-  , token :: AuthenticationToken
+  , client :: Api.Client
   , locale :: Locale
   , busy :: Boolean
   }
@@ -54,8 +53,7 @@ _editing = prop (SProxy :: SProxy "editing")
 
 type Input =
   { userId :: Int
-  , baseUrl :: URL
-  , token :: AuthenticationToken
+  , client :: Api.Client
   , locale :: Locale
   }
 
@@ -77,8 +75,8 @@ ui =
     }
 
 initialState :: Input -> State
-initialState { userId, baseUrl, token, locale } =
-    { userId, baseUrl, token, locale
+initialState { userId, client, locale } =
+    { userId, client, locale
     , user: Nothing
     , editing: Nothing
     , busy: false
@@ -174,12 +172,11 @@ eval = case _ of
     busy <- H.gets _.busy
     when (not busy) do
       H.modify _{ busy = true }
-      url <- H.gets _.baseUrl
-      token <- H.gets _.token
+      cli <- H.gets _.client
       userId <- H.gets _.userId
       res <- runExceptT do
         user <- onLeft "Failed to access api"
-                =<< (H.liftAff $ attempt $ Users.find url token userId)
+                =<< (H.liftAff $ attempt $ Users.find cli userId)
         lift do
           H.modify _{ user = Just user, editing = Just user }
 
@@ -199,12 +196,11 @@ eval = case _ of
       Just editing_ ->
         when (not busy) do
           H.modify _{ busy = true }
-          url <- H.gets _.baseUrl
-          token <- H.gets _.token
+          cli <- H.gets _.client
           userId <- H.gets _.userId
           res <- runExceptT do
             user <- onLeft "Failed to access api"
-                    =<< (H.liftAff $ attempt $ Users.update url token editing_)
+                    =<< (H.liftAff $ attempt $ Users.update cli editing_)
             lift do
               H.modify _{ user = Just user, editing = Just user }
 

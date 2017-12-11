@@ -2,22 +2,20 @@ module Component.UserListUI where
 
 import Prelude
 
-import Api.Token (AuthenticationToken)
+import Api as Api
 import Api.Users as Users
 import Component.HTML.LoadingIndicator as LoadingIndicator
 import Control.Monad.Aff (Aff, attempt)
 import Control.Monad.Except (ExceptT, lift, runExceptT, throwError)
-import Data.DateTime as DateTime
-import Data.DateTime.Locale (Locale(Locale))
-import Data.Either (Either(..), either)
-import Data.Formatter.DateTime (formatDateTime)
-import Data.Maybe (Maybe(..), maybe)
+import Data.DateTime.Locale (Locale)
+import Data.Either (Either, either)
+import Data.Maybe (Maybe(Nothing, Just))
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Properties as HP
 import I18n as I18n
 import Model.User (User(..), Users)
-import Network.HTTP.Affjax (AJAX, URL)
+import Network.HTTP.Affjax (AJAX)
 import Route as R
 
 
@@ -29,19 +27,17 @@ derive instance ordSlot :: Ord Slot
 data Query a
   = Initialize a
   | SetLocale Locale a
-  | Scan a
+  | Reload a
 
 type State =
   { items :: Users
-  , baseUrl :: URL
-  , token :: AuthenticationToken
+  , client :: Api.Client
   , locale :: Locale
   , busy :: Boolean
   }
 
 type Input =
-  { baseUrl :: URL
-  , token :: AuthenticationToken
+  { client :: Api.Client
   , locale :: Locale
   }
 
@@ -63,10 +59,9 @@ ui =
     }
 
 initialState :: Input -> State
-initialState { locale, token, baseUrl } =
+initialState { client, locale } =
     { items: []
-    , baseUrl
-    , token
+    , client
     , locale
     , busy: false
     }
@@ -122,20 +117,19 @@ render state =
 eval :: forall eff. Query ~> H.ComponentDSL State Query Message (Eff_ eff)
 eval = case _ of
   Initialize next -> do
-    eval $ Scan next
+    eval $ Reload next
 
   SetLocale locale next -> do
     H.modify _{ locale = locale }
     pure next
 
-  Scan next -> do
+  Reload next -> do
     busy <- H.gets _.busy
     when (not busy) do
       H.modify _{ busy = true }
-      url <- H.gets _.baseUrl
-      token <- H.gets _.token
+      cli <- H.gets _.client
       res <- runExceptT do
-        users <- onLeft "Failed to access api" =<< (H.liftAff $ attempt $ Users.index url token)
+        users <- onLeft "Failed to access api" =<< (H.liftAff $ attempt $ Users.index cli)
         lift do
           H.modify _{ items = users }
 

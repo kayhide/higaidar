@@ -2,15 +2,13 @@ module Component.LoginUI where
 
 import Prelude
 
-import Api.Token (UserCode, UserTel, AuthenticationToken)
+import Api as Api
 import Api.Token as Token
 import Control.Monad.Aff (Aff, attempt)
 import Control.Monad.Except (ExceptT, runExceptT, throwError)
-import Control.Monad.Maybe.Trans (lift)
 import Data.Either (Either(..), either)
 import Data.Int (fromString)
-import Data.Maybe (Maybe(Just, Nothing), maybe)
-import Data.Tuple (Tuple(..))
+import Data.Maybe (Maybe(Nothing, Just), fromMaybe, maybe)
 import Dom.Storage (STORAGE)
 import Dom.Storage as Storage
 import Halogen as H
@@ -26,14 +24,12 @@ derive instance ordSlot :: Ord Slot
 
 
 type Config =
-  { baseUrl :: URL
+  { endpoint :: URL
   }
 
 type State =
   { config :: Config
-  , code :: UserCode
-  , tel :: UserTel
-  , token :: Maybe AuthenticationToken
+  , form :: Api.AuthenticateForm
   , authenticated :: Boolean
   , name :: Maybe String
   }
@@ -47,8 +43,8 @@ data Query a
 type Input = Config
 
 data Message
-  = Authenticated UserCode UserTel AuthenticationToken
-  | Failed String
+  = Authenticated Api.Client
+  | Failed Api.Client Api.AuthenticateForm String
 
 
 type Eff_ eff = Aff (ajax :: AJAX, storage :: STORAGE | eff)
@@ -57,9 +53,7 @@ ui :: forall eff. H.Component HH.HTML Query Input Message (Eff_ eff)
 ui =
   H.lifecycleComponent
     { initialState: { config: _
-                    , code: 0
-                    , tel: ""
-                    , token: Nothing
+                    , form: Api.AuthenticateForm { code: 0, tel: "" }
                     , authenticated: false
                     , name: Nothing
                     }
@@ -71,18 +65,18 @@ ui =
     }
 
 render :: State -> H.ComponentHTML Query
-render state =
+render state@({ form: Api.AuthenticateForm { code, tel } }) =
   HH.form
   [ HP.class_ $ H.ClassName "form-inline my-2 my-lg-0" ]
   [
     HH.input
     [ HP.class_ $ H.ClassName "form-control mr-2"
-    , HP.value $ show state.code
+    , HP.value $ show code
     , HE.onValueInput $ HE.input SetCode
     ]
   , HH.input
     [ HP.class_ $ H.ClassName "form-control mr-2"
-    , HP.value state.tel
+    , HP.value tel
     , HE.onValueInput $ HE.input SetTel
     ]
   , HH.button
@@ -97,48 +91,52 @@ render state =
 
   where
     buttonClass =
-      "btn " <> maybe "btn-outline-secondary" (const "btn-secondary") state.token
+      "btn " <> if state.authenticated then "btn-secondary" else "btn-outline-secondary"
 
 eval :: forall eff. Query ~> H.ComponentDSL State Query Message (Eff_ eff)
 eval = case _ of
   Initialize next -> do
-    user <- H.liftAff $ attempt do
-      code <- Storage.get "user.code"
-      tel <- Storage.get "user.tel"
-      pure $ Tuple code tel
-
-    case user of
-      Right (Tuple code tel) ->
-        next # (eval <<< SetCode code)
-        >>= (eval <<< SetTel tel)
-        >>= (eval <<< Authenticate)
+    form <- H.liftAff $ attempt loadForm
+    case form of
+      Right form_ -> do
+        H.modify _{ form = form_ }
+        eval $ Authenticate next
       Left s ->
         pure next
 
   Authenticate next -> do
-    url <- (_ <> "/token") <$> H.gets _.config.baseUrl
-    code <- H.gets _.code
-    tel <- H.gets _.tel
-    res <- runExceptT do
-      token <- onLeft "Authentication failed" =<< (H.liftAff $ attempt $ Token.authenticate url code tel)
-      lift $ do
-        H.modify _{ token = Just token }
-        H.raise $ Authenticated code tel token
+    endpoint <- H.gets _.config.endpoint
+    form <- H.gets _.form
+    let cli = Api.makeClient endpoint
 
-    either (H.raise <<< Failed) pure res
+    res <- runExceptT do
+      onLeft "Authentication failed"
+        =<< (H.liftAff $ attempt $ Token.authenticate cli form)
+
+    case res of
+      Right cli_ -> do
+        H.modify _{ authenticated = true }
+        H.liftAff $ saveForm form
+        H.raise $ Authenticated cli_
+
+      Left s -> do
+        H.modify _{ authenticated = false }
+        H.raise $ Failed cli form s
 
     pure next
 
   SetCode code next -> do
     case fromString code of
-      Just code_ ->
-        H.modify $ _{ code = code_ }
+      Just code_ -> do
+        (Api.AuthenticateForm form) <- H.gets _.form
+        H.modify $ _{ form = Api.AuthenticateForm $ form { code = code_ } }
       Nothing ->
         pure unit
     pure next
 
   SetTel tel next -> do
-    H.modify $ _{ tel = tel }
+    (Api.AuthenticateForm form) <- H.gets _.form
+    H.modify $ _{ form = Api.AuthenticateForm $ form { tel = tel } }
     pure next
 
 
@@ -147,3 +145,14 @@ onNothing s = maybe (throwError s) pure
 
 onLeft :: forall e m. Monad m => String -> Either e ~> ExceptT String m
 onLeft s = either (throwError <<< const s) pure
+
+loadForm :: forall eff. Aff (storage :: STORAGE | eff) Api.AuthenticateForm
+loadForm = do
+  code <- (fromMaybe 0 <<< fromString) <$> Storage.get "user.code"
+  tel <- Storage.get "user.tel"
+  pure $ Api.AuthenticateForm { code, tel }
+
+saveForm :: forall eff. Api.AuthenticateForm -> Aff (storage :: STORAGE | eff) Unit
+saveForm (Api.AuthenticateForm { code, tel }) = do
+  Storage.set "user.code" $ show code
+  Storage.set "user.tel" tel
