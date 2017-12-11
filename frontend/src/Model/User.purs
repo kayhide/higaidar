@@ -67,12 +67,7 @@ instance decodeUser :: Decode User where
     pure $ User { id, code, tel, name, created_at, updated_at }
 
 instance encodeUser :: Encode User where
-  encode v = toForeign { code, tel, name }
-    where
-      code = v ^. _code
-      tel = v ^. _tel
-      name = v ^. _name
-
+  encode = toForeign <<< toEntity
 
 type Users = Array User
 
@@ -82,3 +77,21 @@ readDateTime value = mapExcept (either (const error) fromString) $ readString va
   where
     fromString = maybe error pure <<< toDateTime <<< unsafePerformEff <<< parse
     error = Left $ NEL.singleton $ TypeMismatch "DateTime" (tagOf value)
+
+toEntity :: User -> UserEntity
+toEntity (User { code, tel, name }) = UserEntity { code, tel, name }
+
+
+type UserEntityRec
+  = { code :: Int
+    , tel :: String
+    , name :: String
+    }
+newtype UserEntity = UserEntity UserEntityRec
+
+derive instance genericUserEntity :: Generic UserEntity _
+instance showUserEntity :: Show UserEntity where
+  show = genericShow
+
+instance encodeUserEntity :: Encode UserEntity where
+  encode (UserEntity { code, tel, name }) = toForeign { code, tel, name }

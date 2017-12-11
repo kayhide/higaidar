@@ -192,12 +192,11 @@ eval = case _ of
     pure next
 
   HandleUserList (UserListUI.Failed s) next -> do
-    postAlert "Failed to access resource."
-    postAlert "Try login again."
+    postAlert s
     pure next
 
   HandleUserShow (UserShowUI.Failed s) next -> do
-    postAlert "Failed to access resource."
+    postAlert s
     pure next
     -- H.modify _{ token = Nothing, userName = Nothing }
     -- postAlert "Failed to access database."

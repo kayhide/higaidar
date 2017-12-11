@@ -70,7 +70,11 @@ get :: forall eff a. Decode a => Client -> String -> Aff (ajax :: AJAX | eff) a
 get cli path
   = buildGet cli path >>= Affjax.affjax >>= handle
 
-patch :: forall eff a. Encode a => Decode a => Client -> String -> a -> Aff (ajax :: AJAX | eff) a
+post :: forall eff a b. Encode a => Decode b => Client -> String -> a -> Aff (ajax :: AJAX | eff) b
+post cli path x
+  = buildPost cli path x >>= Affjax.affjax >>= handle
+
+patch :: forall eff a b. Encode a => Decode b => Client -> String -> a -> Aff (ajax :: AJAX | eff) b
 patch cli path x
   = buildPatch cli path x >>= Affjax.affjax >>= handle
 
@@ -86,15 +90,15 @@ buildGet cli path = do
       headers = [ RequestHeader "Authorization" $ "Bearer " <> token ]
   pure $ Affjax.defaultRequest { url = url, headers = headers }
 
+buildPost :: forall eff a. Encode a => Client -> String -> a -> Aff eff (AffjaxRequest String)
+buildPost cli path x = do
+  req <- buildGet cli path
+  pure $ req { method = Left POST, content = Just $ encodeJSON x }
+
 buildPatch :: forall eff a. Encode a => Client -> String -> a -> Aff eff (AffjaxRequest String)
 buildPatch cli path x = do
-  token <- verifyToken cli
-  let url = cli ^. _endpoint <> path
-      headers = [ RequestHeader "Authorization" $ "Bearer " <> token ]
-  pure $ Affjax.defaultRequest { url = url
-                               , headers = headers
-                               , method = Left PATCH
-                               , content = Just $ encodeJSON x }
+  req <- buildPost cli path x
+  pure $ req { method = Left PATCH }
 
 
 newtype ResponseNg
