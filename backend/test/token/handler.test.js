@@ -16,7 +16,8 @@ let model;
 let User;
 before(() => co(function *(){
   model = proxyquire('app/model', helper.stub);
-  User = yield model.with(['user'], _.identity);
+  const m = yield model.with(_.identity);
+  User = m.User;
 }));
 
 beforeEach(() => co(function *(){

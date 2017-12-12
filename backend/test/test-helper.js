@@ -42,28 +42,10 @@ before((done) => {
   }).catch(done);
 });
 
-
-let sequelize;
-const initSequelize = () => {
-  if (sequelize) {
-    return Promise.resolve(sequelize);
-  }
-  const db_config = yaml.safeLoad(fs.readFileSync(path.join(__dirname, '../../db/config.yml')));
-  const c = db_config[process.env.STAGE];
-  sequelize = new Sequelize(c.database, c.username, c.password, {
-    host: 'localhost',
-    dialect: { mysql2: 'mysql' }[c.adapter] || c.adapter
-  })
-
-  return Promise.resolve(sequelize);
-};
-
-module.exports.stub = {
-  'app/model/conn': {
-    initSequelize: initSequelize,
-    '@global': true
-  }
-};
+module.exports.stub = Object.assign(
+  {},
+  require('lib/connStub').stub
+);
 
 
 const comparablify = (x) => {

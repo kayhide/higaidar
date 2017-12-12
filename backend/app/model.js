@@ -1,15 +1,17 @@
 'use strict';
 
+const _ = require('lodash');
+
 const conn = require('app/model/conn');
 
 
 let sequelize;
 
-module.exports.with = (models, f) => {
+module.exports.with = (f) => {
   const attempt = (s) => {
     sequelize = s;
-    const args = models.map(m => require(`app/model/${m}`).define(sequelize));
-    return f(...args);
+    const m = load(sequelize);
+    return f(m);
   };
 
   const retry = (err) => {
@@ -23,4 +25,17 @@ module.exports.with = (models, f) => {
 
   return (sequelize ? Promise.resolve(sequelize) : conn.initSequelize())
     .then(attempt).catch(retry)
+};
+
+
+const load = (sequelize) => {
+  const defs = {
+    User: require('app/model/user'),
+    Photo: require('app/model/photo')
+  };
+
+  const m = _.mapValues(defs, d => d.define(sequelize));
+  _.mapValues(defs, d => d.relate(m));
+
+  return m;
 };

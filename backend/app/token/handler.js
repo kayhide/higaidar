@@ -21,8 +21,8 @@ module.exports.create = (event, context, callback) => {
       code: params.code || null,
       tel: params.tel || null
     }
-    const data = yield model.with(['user'], (User) => {
-      return User.findOne({ where }).then(verify.authention);
+    const data = yield model.with(m => {
+      return m.User.findOne({ where }).then(verify.authention);
     });
     const user = data.dataValues;
     const token = jwt.sign(

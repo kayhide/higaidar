@@ -5,6 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const yaml = require('js-yaml');
 const co = require('co');
+const proxyquire = require('proxyquire');
 
 
 const repl = require('repl').start({ useGlobal: true });
@@ -64,5 +65,11 @@ function load() {
       dialect: { mysql2: 'mysql' }[c.adapter] || c.adapter
     })
   }
-  repl.context.User = require('app/model/user').define(sequelize);
+
+  const stub = Object.assign(
+    {},
+    require('lib/connStub').stub
+  );
+  const model = proxyquire('app/model', stub);
+  model.with(m => Object.assign(repl.context, m));
 };

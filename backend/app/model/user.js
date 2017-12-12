@@ -2,8 +2,8 @@
 
 const Sequelize = require('sequelize');
 
-module.exports.define = (sequelize) => {
-  const def = sequelize.define('user', {
+module.exports.define = (sequelize) =>
+  sequelize.define('user', {
     code: { type: Sequelize.INTEGER, allowNull: false, unique: true },
     name: { type: Sequelize.STRING },
     tel: { type: Sequelize.STRING },
@@ -14,5 +14,9 @@ module.exports.define = (sequelize) => {
     updatedAt: 'updated_at'
   });
 
-  return def;
+
+module.exports.relate = (m) => {
+  if (m.User && m.Photo) {
+    m.User.hasMany(m.Photo, { foreignKey: 'user_id' });
+  }
 };
