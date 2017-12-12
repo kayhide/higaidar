@@ -90,3 +90,48 @@ functions:
           method: delete
           cors: true
           authorizer: authorize
+
+  my-photos-index:
+    handler: app/my/photos/handler.index
+    events:
+      - http:
+          path: my/photos
+          method: get
+          cors: true
+          authorizer: authorize
+
+  my-photos-create:
+    handler: app/my/photos/handler.create
+    events:
+      - http:
+          path: my/photos
+          method: post
+          cors: true
+          authorizer: authorize
+
+  my-photos-show:
+    handler: app/my/photos/handler.show
+    events:
+      - http:
+          path: my/photos/{id}
+          method: get
+          cors: true
+          authorizer: authorize
+
+  my-photos-update:
+    handler: app/my/photos/handler.update
+    events:
+      - http:
+          path: my/photos/{id}
+          method: patch
+          cors: true
+          authorizer: authorize
+
+  my-photos-destroy:
+    handler: app/my/photos/handler.destroy
+    events:
+      - http:
+          path: my/photos/{id}
+          method: delete
+          cors: true
+          authorizer: authorize

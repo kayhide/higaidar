@@ -113,11 +113,17 @@ describe('token', () => {
         return co(function *() {
           const res = yield handle(event, {});
           const statements = res.policyDocument.Statement;
-          assert(statements.length === 1);
+          assert(statements.length === 2);
+          assert(statements[0].Action === 'execute-api:Invoke');
           assert(statements[0].Effect === 'Deny');
           assert(_.isEqual(statements[0].Resource, [
             'arn:aws:execute-api:ap-northheast-1::api-id/test/*/users',
             'arn:aws:execute-api:ap-northheast-1::api-id/test/*/users/*',
+          ]));
+          assert(statements[1].Action === 'execute-api:Invoke');
+          assert(statements[1].Effect === 'Allow');
+          assert(_.isEqual(statements[1].Resource, [
+            'arn:aws:execute-api:ap-northheast-1::api-id/test/*/my/*',
           ]));
         });
       });
@@ -138,11 +144,17 @@ describe('token', () => {
         return co(function *() {
           const res = yield handle(event, {});
           const statements = res.policyDocument.Statement;
-          assert(statements.length === 1);
+          assert(statements.length === 2);
+          assert(statements[0].Action === 'execute-api:Invoke');
           assert(statements[0].Effect === 'Allow');
           assert(_.isEqual(statements[0].Resource, [
             'arn:aws:execute-api:ap-northheast-1::api-id/test/*/users',
             'arn:aws:execute-api:ap-northheast-1::api-id/test/*/users/*',
+          ]));
+          assert(statements[1].Action === 'execute-api:Invoke');
+          assert(statements[1].Effect === 'Allow');
+          assert(_.isEqual(statements[1].Resource, [
+            'arn:aws:execute-api:ap-northheast-1::api-id/test/*/my/*',
           ]));
         });
       });

@@ -45,9 +45,10 @@ module.exports.authorize = (event, context, callback) => {
     if (!m) throw new Error('Bad token');
     const token = m[1];
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const effects = {
-      [decoded.user.is_admin ? 'Allow' : 'Deny']: ['users', 'users/*']
-    };
+    const effects = [
+      [decoded.user.is_admin ? 'Allow' : 'Deny', ['users', 'users/*']],
+      ['Allow', ['my/*']]
+    ];
     const resource = event.methodArn.replace(/\/.*/, `/${process.env.STAGE}/*/`);
     const policy = generatePolicy('user', effects, resource);
     policy.context = {
@@ -67,7 +68,7 @@ const generatePolicy = function(principalId, effects, resource) {
     principalId: principalId,
     policyDocument: {
       Version: '2012-10-17',
-      Statement: _.toPairs(effects).map(([eff, ress]) => {
+      Statement: effects.map(([eff, ress]) => {
         return {
           Action: 'execute-api:Invoke',
           Effect: eff,
