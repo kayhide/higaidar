@@ -6,7 +6,8 @@ module.exports.define = (sequelize) => {
   const def = sequelize.define('user', {
     code: { type: Sequelize.INTEGER, allowNull: false, unique: true },
     name: { type: Sequelize.STRING },
-    tel: { type: Sequelize.STRING }
+    tel: { type: Sequelize.STRING },
+    is_admin: { type: Sequelize.BOOLEAN }
   }, {
     timestamps: true,
     createdAt: 'created_at',

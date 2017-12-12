@@ -8,7 +8,8 @@ const factory = {
       yield {
         code: 100 + i,
         name: `User ${i}`,
-        tel: `03-1234-${8900 + i}`
+        tel: `03-1234-${8900 + i}`,
+        is_admin: false
       }
     };
   }
