@@ -85,7 +85,7 @@ module.exports = {
     new ExtractTextPlugin(nameWith('styles', '.css')),
 
     ...Object.keys(entries.regular).map(k => new HtmlPlugin({
-      filename: `${k}.html`,
+      filename: (k === 'index') ? 'index.html' : `${k}/index.html`,
       template: `./static/${k}.html`,
       favicon: './static/favicon.ico',
       chunks: [k]
