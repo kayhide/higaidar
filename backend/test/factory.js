@@ -12,12 +12,19 @@ const factory = {
         is_admin: false
       }
     };
+  },
+  photo: function *() {
+    for (let i = 1;; ++i) {
+      yield {
+        is_uploaded: false,
+        original_url: `http://higaidar.test/photo-${i}.jpg`,
+        thumbnail_url: null
+      }
+    };
   }
 };
 
-const cur = {
-  user: factory.user()
-};
+const cur = _.mapValues(factory, f => f());
 
 const build = (model, opts = {}) => {
   return Object.assign(cur[model.name].next().value, opts);

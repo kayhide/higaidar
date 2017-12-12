@@ -18,9 +18,9 @@ module.exports.index = (event, context, callback) => {
     const { offset, limit } = Object.assign(
       { offset: 0, limit: 50 },
       _.pick(event.queryStringParameters, 'offset', 'limit'));
-    const { data, total } = yield model.with(['user'], (User) => co(function *() {
-      const data = yield User.findAll({ order: [['code', 'ASC']], offset, limit });
-      const total = yield User.count();
+    const { data, total } = yield model.with(m => co(function *() {
+      const data = yield m.User.findAll({ order: [['code', 'ASC']], offset, limit });
+      const total = yield m.User.count();
       return { data, total }
     }));
 
@@ -36,8 +36,8 @@ module.exports.create = (event, context, callback) => {
 
   co(function *() {
     const params = JSON.parse(event.body);
-    const data = yield model.with(['user'], (User) => {
-      return User.create(params);
+    const data = yield model.with(m => {
+      return m.User.create(params);
     });
 
     handleSuccess(callback)(data.dataValues);
@@ -51,8 +51,8 @@ module.exports.show = (event, context, callback) => {
 
   co(function *() {
     const id = event.pathParameters.id;
-    const data = yield model.with(['user'], (User) => {
-      return User.findById(id).then(verify.presence);
+    const data = yield model.with(m => {
+      return m.User.findById(id).then(verify.presence);
     });
 
     handleSuccess(callback)(data.dataValues);
@@ -67,8 +67,8 @@ module.exports.update = (event, context, callback) => {
   co(function *() {
     const id = event.pathParameters.id;
     const params = JSON.parse(event.body);
-    const data = yield model.with(['user'], (User) => {
-      return User.findById(id).then(verify.presence).then(u => u.update(params));
+    const data = yield model.with(m => {
+      return m.User.findById(id).then(verify.presence).then(u => u.update(params));
     });
 
     handleSuccess(callback)(data.dataValues);
@@ -82,8 +82,8 @@ module.exports.destroy = (event, context, callback) => {
 
   co(function *() {
     const id = event.pathParameters.id;
-    const data = yield model.with(['user'], (User) => {
-      return User.findById(id).then(verify.presence).then(u => u.destroy());
+    const data = yield model.with(m => {
+      return m.User.findById(id).then(verify.presence).then(u => u.destroy());
     });
 
     handleSuccess(callback)(null);
