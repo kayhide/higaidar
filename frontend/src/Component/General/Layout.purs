@@ -1,19 +1,17 @@
-module Component.MainUI where
+module Component.General.Layout where
 
 import Prelude
 
 import Api as Api
 import Component.LoginUI as LoginUI
 import Component.NoticeUI as NoticeUI
-import Component.UserListUI as UserListUI
-import Component.UserShowUI as UserShowUI
 import Control.Monad.Aff (Aff, launchAff_)
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Now (NOW)
 import Control.Monad.Eff.Now as Now
 import Data.DateTime.Locale (Locale(..), LocaleName(..))
-import Data.Either.Nested (Either4)
-import Data.Functor.Coproduct.Nested (Coproduct4)
+import Data.Either.Nested (Either2)
+import Data.Functor.Coproduct.Nested (Coproduct2)
 import Data.Maybe (Maybe(Just, Nothing))
 import Data.Time.Duration (Minutes(..))
 import Dom.Storage (STORAGE)
@@ -38,8 +36,6 @@ data Query a
   = Initialize a
   | HandleNotice NoticeUI.Message a
   | HandleLogin LoginUI.Message a
-  | HandleUserList UserListUI.Message a
-  | HandleUserShow UserShowUI.Message a
   | Goto R.Location a
 
 type State =
@@ -54,20 +50,14 @@ type Input = AppConfig
 
 type Message = Void
 
-type ChildQuery = Coproduct4 NoticeUI.Query LoginUI.Query UserListUI.Query UserShowUI.Query
-type ChildSlot = Either4 NoticeUI.Slot LoginUI.Slot UserListUI.Slot UserShowUI.Slot
+type ChildQuery = Coproduct2 NoticeUI.Query LoginUI.Query
+type ChildSlot = Either2 NoticeUI.Slot LoginUI.Slot
 
 cpNotice :: CP.ChildPath NoticeUI.Query ChildQuery NoticeUI.Slot ChildSlot
 cpNotice = CP.cp1
 
 cpLogin :: CP.ChildPath LoginUI.Query ChildQuery LoginUI.Slot ChildSlot
 cpLogin = CP.cp2
-
-cpUserList :: CP.ChildPath UserListUI.Query ChildQuery UserListUI.Slot ChildSlot
-cpUserList = CP.cp3
-
-cpUserShow :: CP.ChildPath UserShowUI.Query ChildQuery UserShowUI.Slot ChildSlot
-cpUserShow = CP.cp4
 
 type Eff_ eff = Aff (ajax :: AJAX, now :: NOW, storage :: STORAGE | eff)
 
@@ -96,35 +86,16 @@ render state =
   HH.div_
   [
     HH.nav
-    [ HP.class_ $ H.ClassName "navbar navbar-dark bg-dark" ]
+    [ HP.class_ $ H.ClassName "navbar navbar-light bg-light" ]
     [
       HH.a
       [ HP.class_ $ H.ClassName "navbar-brand mb-0"
       , HP.href $ R.path R.Home
       ]
-      [ HH.text "Higaidar Admin" ]
-    , HH.ul
-      [ HP.class_ $ H.ClassName "navbar-nav mr-auto" ]
-      [
-        HH.li
-        [ HP.class_ $ H.ClassName "nav-item" ]
-        [
-          HH.a
-          [ HP.class_ $ H.ClassName "nav-link"
-          , HP.href $ R.path $ R.UsersIndex
-          ]
-          [ HH.text "Users" ]
-        ]
-      ]
+      [ HH.text "Higaidar" ]
+    , renderAdminMenu
     , renderUserName
-    , HH.a
-      [ HP.class_ $ H.ClassName $ "btn btn-sm "
-        <> if isAuthenticated then "btn-secondary" else "btn-outline-secondary"
-      , HP.href $ R.path R.Login
-      ]
-      [
-        HH.i [ HP.class_ $ H.ClassName "fa fa-user fa-fw" ] []
-      ]
+    , renderLoginButton
     ]
   , HH.slot' cpNotice NoticeUI.Slot NoticeUI.ui unit $ HE.input HandleNotice
   , HH.main
@@ -144,6 +115,26 @@ render state =
       "btn btn-outline-primary mb-2"
       <> if isAuthenticated then "" else " disabled"
 
+    renderAdminMenu = case client of
+      Api.Client { user: Just (User { is_admin: true }) } ->
+        HH.ul
+        [ HP.class_ $ H.ClassName "navbar-nav ml-auto mr-4" ]
+        [
+          HH.li
+          [ HP.class_ $ H.ClassName "nav-item" ]
+          [
+            HH.a
+            [ HP.class_ $ H.ClassName "nav-link"
+            , HP.href "/admin/#/"
+            ]
+            [ HH.text "Admin" ]
+          ]
+        ]
+      _ ->
+        HH.ul
+        [ HP.class_ $ H.ClassName "navbar-nav ml-auto" ]
+        []
+
     renderUserName = case client of
       Api.Client { user: Just (User { name }) } ->
         HH.span
@@ -152,18 +143,26 @@ render state =
       _ ->
         HH.span_ []
 
-    renderPage = case _ of
-      R.Home -> withAuthentication
-                $ HH.p_ [ HH.text $ "Home" ]
+    renderLoginButton =
+      HH.a
+      [ HP.class_ $ H.ClassName $ "btn btn-sm "
+        <> if isAuthenticated then "btn-secondary" else "btn-outline-secondary"
+      , HP.href $ R.path R.Login
+      ]
+      [
+        HH.i [ HP.class_ $ H.ClassName "fa fa-user fa-fw" ] []
+      ]
 
+    renderPage = case _ of
       R.Login ->
         HH.slot' cpLogin LoginUI.Slot LoginUI.ui { endpoint } $ HE.input HandleLogin
 
-      R.UsersIndex -> withAuthentication
-        $ HH.slot' cpUserList UserListUI.Slot UserListUI.ui { client, locale } $ HE.input HandleUserList
+      R.Home ->
+        withAuthentication
+        $ HH.p_ [ HH.text $ "Home" ]
 
-      R.UsersShow userId -> withAuthentication
-        $ HH.slot' cpUserShow UserShowUI.Slot UserShowUI.ui { userId, client, locale } $ HE.input HandleUserShow
+      _ ->
+        HH.text $ "Page not found"
 
     withAuthentication html =
       if Api.isAuthenticated client
@@ -175,7 +174,7 @@ eval = case _ of
   Initialize next -> do
     locale <- H.liftEff Now.locale
     H.modify _{ locale = locale }
-    pure next
+    eval $ Goto R.Home next
 
   HandleNotice (NoticeUI.Closed i) next -> do
     pure next
@@ -190,19 +189,6 @@ eval = case _ of
     H.modify _{ apiClient = client }
     postAlert s
     pure next
-
-  HandleUserList (UserListUI.Failed s) next -> do
-    postAlert s
-    pure next
-
-  HandleUserShow (UserShowUI.Failed s) next -> do
-    postAlert s
-    pure next
-    -- H.modify _{ token = Nothing, userName = Nothing }
-    -- postAlert "Failed to access database."
-    -- postAlert "Try login again."
-    -- loc <- H.gets _.location
-    -- eval $ Goto loc next
 
   Goto loc next -> do
     cli <- H.gets _.apiClient

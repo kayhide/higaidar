@@ -1,9 +1,9 @@
-module Main where
+module MainAdmin where
 
 import Prelude
 
-import Component.MainUI (AppConfig)
-import Component.MainUI as MainUI
+import Component.Admin.Layout (AppConfig)
+import Component.Admin.Layout as Layout
 import Control.Monad.Aff.Console (CONSOLE)
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Class (liftEff)
@@ -22,8 +22,8 @@ main :: Eff AppEffs Unit
 main = HA.runHalogenAff do
   body <- HA.awaitBody
   appConfig <- liftEff readConfig
-  driver <- runUI MainUI.ui appConfig body
-  liftEff $ MainUI.matchRoute driver
+  driver <- runUI Layout.ui appConfig body
+  liftEff $ Layout.matchRoute driver
 
 readConfig :: Eff AppEffs AppConfig
 readConfig = do

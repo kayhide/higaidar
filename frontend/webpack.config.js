@@ -24,10 +24,10 @@ const nameWith = (env => {
 
 const entries = {
   regular: {
-    admin: './src/entry.js'
+    index: './src/entry_general.js',
+    admin: './src/entry_admin.js'
   },
   static: {
-    index: './static/index.html'
   }
 }
 
