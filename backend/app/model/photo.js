@@ -10,12 +10,13 @@ module.exports.define = (sequelize) =>
   }, {
     timestamps: true,
     createdAt: 'created_at',
-    updatedAt: 'updated_at'
+    updatedAt: 'updated_at',
+    underscored: true
   });
 
 
 module.exports.relate = (m) => {
   if (m.Photo && m.User) {
-    m.Photo.belongsTo(m.User, { foreignKey: 'user_id' });
+    m.Photo.belongsTo(m.User);
   }
 };
