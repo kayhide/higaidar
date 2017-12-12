@@ -12,8 +12,16 @@ provider:
         - rds-db:connect
       Resource:
         - "arn:aws:rds-db:${self:provider.region}:*:dbuser:${self:custom.rds.DBI_RESOURCE_ID}/lambda"
+    - Effect: Allow
+      Action:
+        - s3:GetObject
+        - s3:PutObject
+        - s3:PutObjectACL
+      Resource:
+        - "arn:aws:s3:::${self:provider.environment.RESOURCE_PREFIX}photos/*"
   environment:
     STAGE: ${self:provider.stage}
+    RESOURCE_PREFIX: ${self:service}-${self:provider.stage}-
     AWS_RDS_REGION: ${self:provider.region}
     AWS_RDS_HOST: ${self:custom.rds.HOST}
     AWS_RDS_PORT: ${self:custom.rds.PORT}
@@ -135,3 +143,18 @@ functions:
           method: delete
           cors: true
           authorizer: authorize
+
+resources:
+  Resources:
+    S3BucketPhotos:
+      Type: "AWS::S3::Bucket"
+      # DeletionPolicy: Retain
+      Properties:
+        BucketName: ${self:provider.environment.RESOURCE_PREFIX}photos
+        CorsConfiguration:
+          CorsRules:
+            - AllowedMethods:
+                - GET
+                - HEAD
+              AllowedOrigins:
+                - "*"
