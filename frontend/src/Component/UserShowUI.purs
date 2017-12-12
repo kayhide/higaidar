@@ -4,6 +4,7 @@ import Prelude
 
 import Api as Api
 import Api.Users as Users
+import Component.HTML.Checkbox as Checkbox
 import Component.HTML.LoadingIndicator as LoadingIndicator
 import Component.HTML.TextField as TextField
 import Control.Monad.Aff (Aff, attempt)
@@ -35,7 +36,8 @@ data Query a
   = Initialize a
   | SetLocale Locale a
   | Reload a
-  | SetAttr (Lens' User String) String a
+  | SetString (Lens' User String) String a
+  | SetBoolean (Lens' User Boolean) Boolean a
   | Submit a
 
 type State =
@@ -104,6 +106,11 @@ render state =
                  (show <<< view User._code)
                  (\s -> maybe s (flip (set User._code) s) <<< fromString)
 
+    _User_is_admin :: Lens' User String
+    _User_is_admin = lens
+                 (show <<< view User._is_admin)
+                 (\s -> maybe s (flip (set User._code) s) <<< fromString)
+
     renderForm =
       HH.form
       [ HP.class_ $ H.ClassName "col-md-12 mb-4" ]
@@ -111,12 +118,17 @@ render state =
         renderInput "user-code" "Code" _User_code
       , renderInput "user-name" "Name" User._name
       , renderInput "user-tel" "Tel" User._tel
+      , renderCheckbox "user-is_admin" "Admin" User._is_admin
       , renderSubmitButton
       ]
 
     renderInput :: String -> String -> Lens' User String -> H.ComponentHTML Query
     renderInput key label attr =
-      TextField.render key label (state.editing ^. _Just <<< attr) $ SetAttr attr
+      TextField.render key label (maybe "" (view attr) state.editing) $ SetString attr
+
+    renderCheckbox :: String -> String -> Lens' User Boolean -> H.ComponentHTML Query
+    renderCheckbox key label attr =
+      Checkbox.render key label (maybe false (view attr) state.editing) $ SetBoolean attr
 
     renderSubmitButton =
       HH.button
@@ -125,7 +137,7 @@ render state =
       ]
       [ HH.text "Submit" ]
 
-    renderItem (User { id, code, tel, name, created_at, updated_at }) =
+    renderItem (User { id, code, tel, name, is_admin, created_at, updated_at }) =
       HH.div
       [ HP.class_ $ H.ClassName "col-sm-6 mb-2" ]
       [
@@ -149,6 +161,9 @@ render state =
           , HH.div
             [ HP.class_ $ H.ClassName "card-text small" ]
             [ HH.text $ tel ]
+          , HH.div
+            [ HP.class_ $ H.ClassName "card-text small" ]
+            [ HH.text $ show is_admin ]
           , HH.div
             [ HP.class_ $ H.ClassName "card-text text-muted small" ]
             [ HH.text $ I18n.localizeDateTime state.locale created_at ]
@@ -185,7 +200,11 @@ eval = case _ of
     H.modify _{ busy = false }
     pure next
 
-  SetAttr attr v next -> do
+  SetString attr v next -> do
+    assign (_editing <<< _Just <<< attr) v
+    pure next
+
+  SetBoolean attr v next -> do
     assign (_editing <<< _Just <<< attr) v
     pure next
 

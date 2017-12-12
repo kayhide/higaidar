@@ -23,7 +23,6 @@ import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
-import I18n as I18n
 import Model.User (User(..), UserEntity(..), Users, UserId)
 import Model.User as User
 import Network.HTTP.Affjax (AJAX)
@@ -107,21 +106,23 @@ render state =
       HH.tr_
       [
         HH.td_
+        []
+      , HH.td_
         [ HH.text "Name" ]
       , HH.td_
         [ HH.text "Code" ]
       , HH.td_
         [ HH.text "Tel" ]
       , HH.td_
-        [ HH.text "Created at" ]
-      , HH.td_
         []
       ]
 
-    renderItem (User { id, code, tel, name, created_at }) =
+    renderItem (User { id, code, tel, name, is_admin, created_at }) =
       HH.tr_
       [
         HH.td_
+        [ renderIsAdmin is_admin ]
+      , HH.td_
         [
           HH.a
           [ HP.href $ R.path $ R.UsersShow id ]
@@ -131,8 +132,6 @@ render state =
         [ HH.text $ show code ]
       , HH.td_
         [ HH.text tel ]
-      , HH.td_
-        [ HH.text $ I18n.localizeDateTime state.locale created_at ]
       , HH.dt_
         [
           HH.button
@@ -144,6 +143,15 @@ render state =
           ]
         ]
       ]
+
+    renderIsAdmin =
+      if _
+      then
+        HH.span
+        [ HP.class_ $ H.ClassName "badge badge-danger" ]
+        [ HH.text "admin" ]
+      else
+        HH.span_ []
 
     renderForm =
       HH.form_
@@ -243,7 +251,7 @@ build row = maybe (Left row) Right $ do
   name <- cols !! 0
   code <- Int.fromString =<< cols !! 1
   tel <- cols !! 2
-  pure $ UserEntity { name, code, tel }
+  pure $ UserEntity { name, code, tel, is_admin: false }
   where
     cols = String.trim <$> String.split (Pattern ",") row
 

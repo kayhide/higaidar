@@ -7,12 +7,12 @@ import Control.Monad.Except (mapExcept)
 import Data.DateTime (DateTime)
 import Data.Either (Either(..), either)
 import Data.Foreign (F, Foreign, ForeignError(TypeMismatch), readString, tagOf, toForeign)
-import Data.Foreign.Class (class Decode, class Encode, decode, encode)
+import Data.Foreign.Class (class Decode, class Encode, decode)
 import Data.Foreign.Index ((!))
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.JSDate (parse, toDateTime)
-import Data.Lens (Lens', lens, (^.))
+import Data.Lens (Lens', lens)
 import Data.Lens.Record (prop)
 import Data.List.NonEmpty as NEL
 import Data.Maybe (maybe)
@@ -25,6 +25,7 @@ type UserRec
     , code :: Int
     , tel :: String
     , name :: String
+    , is_admin :: Boolean
     , created_at :: DateTime
     , updated_at :: DateTime
     }
@@ -45,6 +46,9 @@ _tel = _User <<< prop (SProxy :: SProxy "tel")
 _name :: Lens' User String
 _name = _User <<< prop (SProxy :: SProxy "name")
 
+_is_admin :: Lens' User Boolean
+_is_admin = _User <<< prop (SProxy :: SProxy "is_admin")
+
 _created_at :: Lens' User DateTime
 _created_at = _User <<< prop (SProxy :: SProxy "created_at")
 
@@ -62,9 +66,10 @@ instance decodeUser :: Decode User where
     code <- decode =<< v ! "code"
     tel <- decode =<< v ! "tel"
     name <- decode =<< v ! "name"
+    is_admin <- decode =<< v ! "is_admin"
     created_at <- readDateTime =<< v ! "created_at"
     updated_at <- readDateTime =<< v ! "updated_at"
-    pure $ User { id, code, tel, name, created_at, updated_at }
+    pure $ User { id, code, tel, name, is_admin, created_at, updated_at }
 
 instance encodeUser :: Encode User where
   encode = toForeign <<< toEntity
@@ -79,13 +84,14 @@ readDateTime value = mapExcept (either (const error) fromString) $ readString va
     error = Left $ NEL.singleton $ TypeMismatch "DateTime" (tagOf value)
 
 toEntity :: User -> UserEntity
-toEntity (User { code, tel, name }) = UserEntity { code, tel, name }
+toEntity (User { code, tel, name, is_admin }) = UserEntity { code, tel, name, is_admin }
 
 
 type UserEntityRec
   = { code :: Int
     , tel :: String
     , name :: String
+    , is_admin :: Boolean
     }
 newtype UserEntity = UserEntity UserEntityRec
 
