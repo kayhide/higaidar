@@ -44,9 +44,9 @@ before((done) => {
 
 module.exports.stub = Object.assign(
   {},
-  require('lib/connStub').stub
+  require('lib/connStub').stub,
+  require('lib/awsStub').stub
 );
-
 
 const comparablify = (x) => {
   const x_ = x.dataValues ? x.dataValues : x;
