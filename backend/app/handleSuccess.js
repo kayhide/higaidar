@@ -18,12 +18,12 @@ module.exports = (callback) => (body, opts = {}) => {
   res.headers = {
     "Access-Control-Allow-Origin": "*"
   };
-  console.log(opts);
   if (typeof opts.offset !== 'undefined') {
     const offset = opts.offset;
-    const total = opts.total || '*';
+    const range = body.length > 0 ? `${offset}-${offset + body.length - 1}` : '*';
+    const total = (opts.total !== 'undefined') ? opts.total : '*';
     res.headers['Range-Unit'] = 'items';
-    res.headers['Content-Range'] = `${offset}-${offset + body.length - 1}/${total}`;
+    res.headers['Content-Range'] = `${range}/${total}`;
   };
   callback(null, res);
 };

@@ -20,7 +20,7 @@ describe('token', () => {
     User = m.User;
   }));
 
-  beforeEach(() => co(function *(){
+  afterEach(() => co(function *(){
     yield User.destroy({ where: {} });
   }));
 

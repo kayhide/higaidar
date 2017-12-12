@@ -12,64 +12,84 @@ const fixture = require('test/fixture');
 const factory = require('test/factory');
 
 
-describe('users', () => {
+describe('my/photos', () => {
   let User;
+  let Photo;
   before(() => co(function *(){
     const model = proxyquire('app/model', helper.stub);
     const m = yield model.with(_.identity);
     User = m.User;
+    Photo = m.Photo;
+  }));
+
+  let handler;
+  before(() => {
+    handler = proxyquire('app/my/photos/handler', helper.stub);
+  });
+
+  let user;
+  let event;
+  beforeEach(() => co(function *(){
+    user = yield factory.create(User);
+    event = {
+      requestContext: {
+        authorizer: {
+          userId: user.id.toString()
+        }
+      },
+      body: '{}'
+    };
   }));
 
   afterEach(() => co(function *(){
+    yield Photo.destroy({ where: {} });
     yield User.destroy({ where: {} });
   }));
 
 
   describe('#index', () => {
-    let event;
     let handle;
-
     beforeEach(() => {
-      const handler = proxyquire('app/users/handler', helper.stub);
       handle = promisify(handler.index.bind(handler));
-
-      event = fixture.read('users/event_get');
     });
 
     context('without params', () => {
-      it('returns users', () => {
+      it('returns photos ordered by id desc', () => {
         return co(function *() {
-          const users = yield factory.createList(User, 2);
+          const photos = yield factory.createList(Photo, 2, { user_id: user.id });
+          const photos_ = _.reverse(photos)
+          const n = yield Photo.count();
+          assert(n === 2);
 
           const res = yield handle(event, {})
           assert(res.statusCode === 200);
 
           const body = JSON.parse(res.body);
-          assert(helper.isEqualModel(body[0], users[0]));
-          assert(helper.isEqualModel(body[1], users[1]));
-        });
-      });
-
-      it('orders by code', () => {
-        return co(function *() {
-          const user1 = yield factory.create(User, { code: 5 });
-          const user2 = yield factory.create(User, { code: 2 });
-          const users = [user2, user1];
-
-          const res = yield handle(event, {})
-          assert(res.statusCode === 200);
-
-          const body = JSON.parse(res.body);
-          assert(helper.isEqualModel(body[0], users[0]));
-          assert(helper.isEqualModel(body[1], users[1]));
+          assert(helper.isEqualModel(body[0], photos_[0]));
+          assert(helper.isEqualModel(body[1], photos_[1]));
         });
       });
 
       it('returns content range', () => {
         return co(function *() {
-          const users = yield factory.createList(User, 7);
+          const photos = yield factory.createList(Photo, 7, { user_id: user.id });
           const res = yield handle(event, {})
           assert(res.headers['Content-Range'] === '0-6/7');
+        });
+      });
+
+      it('returns only my photos', () => {
+        return co(function *() {
+          yield factory.createList(Photo, 2, { user_id: user.id });
+
+          const somebody = yield factory.createList(User);
+          yield factory.createList(Photo, 2, { user_id: somebody.id });
+
+          const n = yield Photo.count();
+          assert(n === 4);
+
+          const res = yield handle(event, {})
+          assert(res.headers['Content-Range'] === '0-1/2');
         });
       });
     });
@@ -81,55 +101,47 @@ describe('users', () => {
             offset: 2,
             limit: 3
           };
-          const users = yield factory.createList(User, 7);
+          const photos = yield factory.createList(Photo, 7, { user_id: user.id });
+          const photos_ = _.reverse(photos);
           const res = yield handle(event, {})
           assert(res.headers['Content-Range'] === '2-4/7');
 
           const body = JSON.parse(res.body);
           assert(body.length === 3);
-          assert(helper.isEqualModel(body[0], users[2]));
-          assert(helper.isEqualModel(body[2], users[4]));
+          assert(helper.isEqualModel(body[0], photos_[2]));
+          assert(helper.isEqualModel(body[2], photos_[4]));
         });
       });
     });
   });
 
   describe('#create', () => {
-    let event;
     let handle;
-
     beforeEach(() => {
-      const handler = proxyquire('app/users/handler', helper.stub);
       handle = promisify(handler.create.bind(handler));
-
-      event = fixture.read('users/event_post');
     });
 
     context('with valid attrs', () => {
-      const attrs = {
-        code: 100,
-        name: 'Taro',
-        tel: '0123-4567-8900'
-      };
+      const attrs = {};
 
       beforeEach(() => {
         event.body = JSON.stringify(attrs);
       });
 
-      it('creates a new user', () => {
+      it('creates a new photo', () => {
         return co(function *() {
-          const org = yield User.count();
+          const org = yield Photo.count();
           yield handle(event, {});
-          const cur = yield User.count();
+          const cur = yield Photo.count();
           assert(org === 0);
           assert(cur === 1);
 
-          const user = yield User.findOne();
-          assert(_.matches(user.dataValues, attrs));
+          const photo = yield Photo.findOne();
+          assert(_.matches(photo.dataValues, attrs));
         });
       });
 
-      it('returns attributes of the new user', () => {
+      it('returns attributes of the new photo', () => {
         return co(function *() {
           const res = yield handle(event, {});
           assert(res.statusCode === 200);
@@ -139,58 +151,27 @@ describe('users', () => {
         });
       });
     });
-
-    context('with invalid attrs', () => {
-      const attrs = {
-        code: null,
-        name: 'Taro',
-        tel: '0123-4567-8900'
-      };
-
-      beforeEach(() => {
-        event.body = JSON.stringify(attrs);
-      });
-
-      it('fails to creates a new user', () => {
-        return co(function *() {
-          yield handle(event, {});
-          const cur = yield User.count();
-          assert(cur === 0);
-        });
-      });
-
-      it('returns 400', () => {
-        return co(function *() {
-          const res = yield handle(event, {});
-          assert(res.statusCode === 400);
-        });
-      });
-    });
   });
 
   describe('#show', () => {
-    let event;
     let handle;
-    let user;
-
+    let photo;
     beforeEach(() => co(function *() {
-      const handler = proxyquire('app/users/handler', helper.stub);
       handle = promisify(handler.show.bind(handler));
 
-      user = yield factory.create(User);
-      event = fixture.read('users/event_get');
-      event.pathParameters = { id: user.id };
+      photo = yield factory.create(Photo, { user_id: user.id });
+      event.pathParameters = { id: photo.id };
     }));
 
 
     context('with valid attrs', () => {
-      it('returns attributes of the user', () => {
+      it('returns attributes of the photo', () => {
         return co(function *() {
           const res = yield handle(event, {});
           assert(res.statusCode === 200);
 
           const body = JSON.parse(res.body);
-          assert(helper.isEqualModel(body, user));
+          assert(helper.isEqualModel(body, photo));
         });
       });
     });
@@ -210,33 +191,25 @@ describe('users', () => {
   });
 
   describe('#update', () => {
-    let event;
     let handle;
-    let user;
-
+    let photo;
     beforeEach(() => co(function *() {
-      const handler = proxyquire('app/users/handler', helper.stub);
       handle = promisify(handler.update.bind(handler));
 
-      user = yield factory.create(User);
-      event = fixture.read('users/event_post');
+      photo = yield factory.create(Photo, { user_id: user.id });
       event.httpMethod = 'PATCH';
-      event.requestContext.httpMethod = 'PATCH';
-      event.pathParameters = { id: user.id };
+      event.pathParameters = { id: photo.id };
     }));
 
     context('with valid attrs', () => {
       const attrs = {
-        code: 200,
-        name: 'Jiro',
-        tel: '0123-4567-9000'
       };
 
       beforeEach(() => {
         event.body = JSON.stringify(attrs);
       });
 
-      it('returns attributes of the user', () => {
+      it('returns attributes of the photo', () => {
         return co(function *() {
           const res = yield handle(event, {});
           assert(res.statusCode === 200);
@@ -259,49 +232,25 @@ describe('users', () => {
         });
       });
     });
-
-    context('with invalid attrs', () => {
-      const attrs = {
-        code: null,
-        name: 'Jiro',
-        tel: '0123-4567-9000'
-      };
-
-      beforeEach(() => {
-        event.body = JSON.stringify(attrs);
-      });
-
-      it('returns 400', () => {
-        return co(function *() {
-          const res = yield handle(event, {});
-          assert(res.statusCode === 400);
-        });
-      });
-    });
   });
 
   describe('#destroy', () => {
-    let event;
     let handle;
-    let user;
-
+    let photo;
     beforeEach(() => co(function *() {
-      const handler = proxyquire('app/users/handler', helper.stub);
       handle = promisify(handler.destroy.bind(handler));
 
-      user = yield factory.create(User);
-      event = fixture.read('users/event_get');
+      photo = yield factory.create(Photo, { user_id: user.id });
       event.httpMethod = 'DELETE';
-      event.requestContext.httpMethod = 'DELETE';
-      event.pathParameters = { id: user.id };
+      event.pathParameters = { id: photo.id };
     }));
 
     context('with valid id', () => {
-      it('deletes the user', () => {
+      it('deletes the photo', () => {
         return co(function *() {
-          const org = yield User.count();
+          const org = yield Photo.count();
           yield handle(event, {});
-          const cur = yield User.count();
+          const cur = yield Photo.count();
           assert(org === 1);
           assert(cur === 0);
         });

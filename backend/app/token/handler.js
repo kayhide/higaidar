@@ -51,8 +51,8 @@ module.exports.authorize = (event, context, callback) => {
     const resource = event.methodArn.replace(/\/.*/, `/${process.env.STAGE}/*/`);
     const policy = generatePolicy('user', effects, resource);
     policy.context = {
-      userId: decoded.id,
-      userName: decoded.name
+      userId: decoded.user.id,
+      userName: decoded.user.name
     }
     callback(null, policy);
   }).catch(err => {

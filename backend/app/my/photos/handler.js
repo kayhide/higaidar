@@ -19,13 +19,14 @@ module.exports.index = (event, context, callback) => {
       { offset: 0, limit: 50 },
       _.pick(event.queryStringParameters, 'offset', 'limit'));
     const { data, total } = yield model.with(m => co(function *() {
-      const data = yield Photo.findAll({ order: [['code', 'ASC']], offset, limit });
-      const total = yield Photo.count();
-      return { data, total }
+      const user = yield getUser(m, event).then(verify.presence);
+      const data = yield user.getPhotos({ order: [['id', 'DESC']], offset, limit });
+      const total = yield user.countPhotos();
+      return { data, total: total || 0 };
     }));
 
-    const users = data.map(u => u.dataValues);
-    handleSuccess(callback)(users, { offset, limit, total });
+    const items = data.map(u => u.dataValues);
+    handleSuccess(callback)(items, { offset, limit, total });
 
   }).catch(handleError(callback));
 };
@@ -36,9 +37,10 @@ module.exports.create = (event, context, callback) => {
 
   co(function *() {
     const params = JSON.parse(event.body);
-    const data = yield model.with(m => {
-      return Photo.create(params);
-    });
+    const data = yield model.with(m => co(function *() {
+      const user = yield getUser(m, event).then(verify.presence);
+      return user.createPhoto(params);
+    }));
 
     handleSuccess(callback)(data.dataValues);
 
@@ -51,9 +53,10 @@ module.exports.show = (event, context, callback) => {
 
   co(function *() {
     const id = event.pathParameters.id;
-    const data = yield model.with(m => {
-      return Photo.findById(id).then(verify.presence);
-    });
+    const data = yield model.with(m => co(function *() {
+      const user = yield getUser(m, event).then(verify.presence);
+      return m.Photo.findOne({ where: { id: id, user_id: user.id } }).then(verify.presence);
+    }));
 
     handleSuccess(callback)(data.dataValues);
 
@@ -67,9 +70,11 @@ module.exports.update = (event, context, callback) => {
   co(function *() {
     const id = event.pathParameters.id;
     const params = JSON.parse(event.body);
-    const data = yield model.with(m => {
-      return Photo.findById(id).then(verify.presence).then(u => u.update(params));
-    });
+    const data = yield model.with(m => co(function *() {
+      const user = yield getUser(m, event).then(verify.presence);
+      return m.Photo.findOne({ where: { id: id, user_id: user.id } }).then(verify.presence)
+        .then(u => u.update(params));
+    }));
 
     handleSuccess(callback)(data.dataValues);
 
@@ -82,11 +87,19 @@ module.exports.destroy = (event, context, callback) => {
 
   co(function *() {
     const id = event.pathParameters.id;
-    const data = yield model.with(m => {
-      return Photo.findById(id).then(verify.presence).then(u => u.destroy());
-    });
+    const data = yield model.with(m => co(function *() {
+      const user = yield getUser(m, event).then(verify.presence);
+      return m.Photo.findOne({ where: { id: id, user_id: user.id } }).then(verify.presence)
+        .then(u => u.destroy());
+    }));
 
     handleSuccess(callback)(null);
 
   }).catch(handleError(callback));
+};
+
+
+const getUser = (m, event) => {
+  const id = event.requestContext.authorizer.userId;
+  return m.User.findById(id);
 };
