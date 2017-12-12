@@ -93,24 +93,56 @@ describe('#authorize', () => {
     const handler = proxyquire('app/token/handler', helper.stub);
     handle = promisify(handler.authorize.bind(handler));
 
-    user = yield factory.create(User);
-    token = jwt.sign(
-      { user: user.dataValues },
-      process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRES_IN }
-    )
     event = {};
-    event.methodArn = 'arn:aws:execute-api:ap-northheast-1::api-id/test/*';
-    event.authorizationToken = `Bearer ${token}`;
+    event.methodArn = 'arn:aws:execute-api:ap-northheast-1::api-id/test/GET/something';
   }));
 
-  context('with valid token', () => {
-    it('authorizes', () => {
+  context('with valid token of non-admin user', () => {
+    beforeEach(() => co(function *() {
+      user = yield factory.create(User);
+      token = jwt.sign(
+        { user: user.dataValues },
+        process.env.JWT_SECRET,
+        { expiresIn: process.env.JWT_EXPIRES_IN }
+      )
+      event.authorizationToken = `Bearer ${token}`;
+    }));
+
+    it('generates policy', () => {
       return co(function *() {
         const res = yield handle(event, {});
-        assert(res.policyDocument.Statement[0].Action === 'execute-api:Invoke');
-        assert(res.policyDocument.Statement[0].Effect === 'Allow');
-        assert(res.policyDocument.Statement[0].Resource === event.methodArn);
+        const statements = res.policyDocument.Statement;
+        assert(statements.length === 1);
+        assert(statements[0].Effect === 'Deny');
+        assert(_.isEqual(statements[0].Resource, [
+          'arn:aws:execute-api:ap-northheast-1::api-id/test/*/users',
+          'arn:aws:execute-api:ap-northheast-1::api-id/test/*/users/*',
+        ]));
+      });
+    });
+  });
+
+  context('with valid token of admin user', () => {
+    beforeEach(() => co(function *() {
+      user = yield factory.create(User, { is_admin: true });
+      token = jwt.sign(
+        { user: user.dataValues },
+        process.env.JWT_SECRET,
+        { expiresIn: process.env.JWT_EXPIRES_IN }
+      )
+      event.authorizationToken = `Bearer ${token}`;
+    }));
+
+    it('generates policy', () => {
+      return co(function *() {
+        const res = yield handle(event, {});
+        const statements = res.policyDocument.Statement;
+        assert(statements.length === 1);
+        assert(statements[0].Effect === 'Allow');
+        assert(_.isEqual(statements[0].Resource, [
+          'arn:aws:execute-api:ap-northheast-1::api-id/test/*/users',
+          'arn:aws:execute-api:ap-northheast-1::api-id/test/*/users/*',
+        ]));
       });
     });
   });

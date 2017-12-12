@@ -45,8 +45,11 @@ module.exports.authorize = (event, context, callback) => {
     if (!m) throw new Error('Bad token');
     const token = m[1];
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const resource = event.methodArn.replace(/\/.*/, `/${process.env.STAGE}/*`);
-    const policy = generatePolicy('user', 'Allow', resource);
+    const effects = {
+      [decoded.user.is_admin ? 'Allow' : 'Deny']: ['users', 'users/*']
+    };
+    const resource = event.methodArn.replace(/\/.*/, `/${process.env.STAGE}/*/`);
+    const policy = generatePolicy('user', effects, resource);
     policy.context = {
       userId: decoded.id,
       userName: decoded.name
@@ -59,16 +62,18 @@ module.exports.authorize = (event, context, callback) => {
   });
 };
 
-const generatePolicy = function(principalId, effect, resource) {
+const generatePolicy = function(principalId, effects, resource) {
   return {
     principalId: principalId,
     policyDocument: {
       Version: '2012-10-17',
-      Statement: [{
-        Action: 'execute-api:Invoke',
-        Effect: effect,
-        Resource: resource
-      }]
+      Statement: _.toPairs(effects).map(([eff, ress]) => {
+        return {
+          Action: 'execute-api:Invoke',
+          Effect: eff,
+          Resource: ress.map(res => resource + res)
+        }
+      })
     }
   }
 }
