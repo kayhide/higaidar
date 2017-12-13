@@ -5,6 +5,7 @@ const co = require('co');
 const util = require('util');
 const promisify = require('util.promisify');
 const uuid = require('uuid');
+const mime = require('mime-types');
 const AWS = require('aws-sdk');
 
 const verify = require('app/verify');
@@ -43,7 +44,9 @@ const generateSignedUrl = (user, filename) => {
   const key = `${user.id}/${uuid.v1().replace(/-/g, '/')}/${filename}`
   const params = {
     Bucket: `${process.env.RESOURCE_PREFIX}photos`,
-    Key: key
+    Key: key,
+    ContentType: mime.lookup(filename),
+    ACL: 'public-read'
   };
   return getSignedUrl('putObject', params);
 };
