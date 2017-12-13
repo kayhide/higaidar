@@ -99,6 +99,15 @@ functions:
           cors: true
           authorizer: authorize
 
+  my-photos-signed_url-create:
+    handler: app/my/photos/signed_url/handler.create
+    events:
+      - http:
+          path: my/photos/signed_url
+          method: post
+          cors: true
+          authorizer: authorize
+
   my-photos-index:
     handler: app/my/photos/handler.index
     events:
