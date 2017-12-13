@@ -32,6 +32,7 @@ type State =
   , form :: Api.AuthenticateForm
   , authenticated :: Boolean
   , name :: Maybe String
+  , busy :: Boolean
   }
 
 data Query a
@@ -56,6 +57,7 @@ ui =
                     , form: Api.AuthenticateForm { code: 0, tel: "" }
                     , authenticated: false
                     , name: Nothing
+                    , busy: false
                     }
     , render
     , eval
@@ -67,7 +69,7 @@ ui =
 render :: State -> H.ComponentHTML Query
 render state@({ form: Api.AuthenticateForm { code, tel } }) =
   HH.form
-  [ HP.class_ $ H.ClassName "form-inline my-2 my-lg-0" ]
+  [ HP.class_ $ H.ClassName "form" ]
   [
     HH.input
     [ HP.class_ $ H.ClassName "form-control mr-2"
@@ -105,24 +107,27 @@ eval = case _ of
         pure next
 
   Authenticate next -> do
-    endpoint <- H.gets _.config.endpoint
-    form <- H.gets _.form
-    let cli = Api.makeClient endpoint
+    busy <- H.gets _.busy
+    when (not busy) do
+      endpoint <- H.gets _.config.endpoint
+      form <- H.gets _.form
+      let cli = Api.makeClient endpoint
 
-    res <- runExceptT do
-      onLeft "Authentication failed"
-        =<< (H.liftAff $ attempt $ Token.authenticate cli form)
+      res <- runExceptT do
+        onLeft "Authentication failed"
+          =<< (H.liftAff $ attempt $ Token.authenticate cli form)
 
-    case res of
-      Right cli_ -> do
-        H.modify _{ authenticated = true }
-        H.liftAff $ saveForm form
-        H.raise $ Authenticated cli_
+      case res of
+        Right cli_ -> do
+          H.modify _{ authenticated = true }
+          H.liftAff $ saveForm form
+          H.raise $ Authenticated cli_
 
-      Left s -> do
-        H.modify _{ authenticated = false }
-        H.raise $ Failed cli form s
+        Left s -> do
+          H.modify _{ authenticated = false }
+          H.raise $ Failed cli form s
 
+      H.modify _{ busy = false }
     pure next
 
   SetCode code next -> do

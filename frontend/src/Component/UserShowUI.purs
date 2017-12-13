@@ -210,10 +210,10 @@ eval = case _ of
 
   Submit next -> do
     busy <- H.gets _.busy
-    editing <- H.gets _.editing
-    case editing of
-      Just editing_ ->
-        when (not busy) do
+    when (not busy) do
+      editing <- H.gets _.editing
+      case editing of
+        Just editing_ -> do
           H.modify _{ busy = true }
           cli <- H.gets _.client
           userId <- H.gets _.userId
@@ -225,9 +225,9 @@ eval = case _ of
 
           either (H.raise <<< Failed) pure res
 
-      Nothing -> pure unit
+        Nothing -> pure unit
 
-    H.modify _{ busy = false }
+      H.modify _{ busy = false }
     pure next
 
 onLeft :: forall e m. Monad m => String -> Either e ~> ExceptT String m
