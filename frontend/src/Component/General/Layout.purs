@@ -3,6 +3,7 @@ module Component.General.Layout where
 import Prelude
 
 import Api as Api
+import Component.General.Route as R
 import Component.LoginUI as LoginUI
 import Component.NoticeUI as NoticeUI
 import Control.Monad.Aff (Aff, launchAff_)
@@ -23,7 +24,6 @@ import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Model.User (User(..))
 import Network.HTTP.Affjax (AJAX)
-import Route as R
 import Routing (matches)
 
 

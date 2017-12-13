@@ -4,6 +4,7 @@ import Prelude
 
 import Api as Api
 import Api.Users as Users
+import Component.Admin.Route as R
 import Component.HTML.LoadingIndicator as LoadingIndicator
 import Control.Monad.Aff (Aff, attempt)
 import Control.Monad.Aff.Class (class MonadAff)
@@ -26,7 +27,6 @@ import Halogen.HTML.Properties as HP
 import Model.User (User(..), UserEntity(..), Users, UserId)
 import Model.User as User
 import Network.HTTP.Affjax (AJAX)
-import Route as R
 
 
 data Slot = Slot

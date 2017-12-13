@@ -4,6 +4,7 @@ import Prelude
 
 import Api as Api
 import Api.Users as Users
+import Component.Admin.Route as R
 import Component.HTML.Checkbox as Checkbox
 import Component.HTML.LoadingIndicator as LoadingIndicator
 import Component.HTML.TextField as TextField
@@ -12,7 +13,7 @@ import Control.Monad.Except (ExceptT, lift, runExceptT, throwError)
 import Data.DateTime.Locale (Locale)
 import Data.Either (Either, either)
 import Data.Int (fromString)
-import Data.Lens (Lens', _Just, assign, lens, set, view, (^.))
+import Data.Lens (Lens', _Just, assign, lens, set, view)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(Just, Nothing), maybe)
 import Data.Symbol (SProxy(..))
@@ -24,7 +25,6 @@ import I18n as I18n
 import Model.User (User(User))
 import Model.User as User
 import Network.HTTP.Affjax (AJAX)
-import Route as R
 
 
 data Slot = Slot
