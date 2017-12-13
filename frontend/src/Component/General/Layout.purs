@@ -6,13 +6,14 @@ import Api as Api
 import Component.General.Route as R
 import Component.LoginUI as LoginUI
 import Component.NoticeUI as NoticeUI
+import Component.UploadUI as UploadUI
 import Control.Monad.Aff (Aff, launchAff_)
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Now (NOW)
 import Control.Monad.Eff.Now as Now
 import Data.DateTime.Locale (Locale(..), LocaleName(..))
-import Data.Either.Nested (Either2)
-import Data.Functor.Coproduct.Nested (Coproduct2)
+import Data.Either.Nested (Either3)
+import Data.Functor.Coproduct.Nested (Coproduct3)
 import Data.Maybe (Maybe(Just, Nothing))
 import Data.Time.Duration (Minutes(..))
 import Dom.Storage (STORAGE)
@@ -36,6 +37,7 @@ data Query a
   = Initialize a
   | HandleNotice NoticeUI.Message a
   | HandleLogin LoginUI.Message a
+  | HandleUpload UploadUI.Message a
   | Goto R.Location a
 
 type State =
@@ -50,14 +52,17 @@ type Input = AppConfig
 
 type Message = Void
 
-type ChildQuery = Coproduct2 NoticeUI.Query LoginUI.Query
-type ChildSlot = Either2 NoticeUI.Slot LoginUI.Slot
+type ChildQuery = Coproduct3 NoticeUI.Query LoginUI.Query UploadUI.Query
+type ChildSlot = Either3 NoticeUI.Slot LoginUI.Slot UploadUI.Slot
 
 cpNotice :: CP.ChildPath NoticeUI.Query ChildQuery NoticeUI.Slot ChildSlot
 cpNotice = CP.cp1
 
 cpLogin :: CP.ChildPath LoginUI.Query ChildQuery LoginUI.Slot ChildSlot
 cpLogin = CP.cp2
+
+cpUpload :: CP.ChildPath UploadUI.Query ChildQuery UploadUI.Slot ChildSlot
+cpUpload = CP.cp3
 
 type Eff_ eff = Aff (ajax :: AJAX, now :: NOW, storage :: STORAGE | eff)
 
@@ -159,10 +164,7 @@ render state =
 
       R.Home ->
         withAuthentication
-        $ HH.p_ [ HH.text $ "Home" ]
-
-      _ ->
-        HH.text $ "Page not found"
+        $ HH.slot' cpUpload UploadUI.Slot UploadUI.ui { client } $ HE.input HandleUpload
 
     withAuthentication html =
       if Api.isAuthenticated client
@@ -187,6 +189,14 @@ eval = case _ of
 
   HandleLogin (LoginUI.Failed client _ s) next -> do
     H.modify _{ apiClient = client }
+    postAlert s
+    pure next
+
+  HandleUpload (UploadUI.Uploaded url) next -> do
+    postInfo "Uploaded."
+    pure next
+
+  HandleUpload (UploadUI.Failed s) next -> do
     postAlert s
     pure next
 
