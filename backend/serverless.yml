@@ -108,6 +108,15 @@ functions:
           cors: true
           authorizer: authorize
 
+  my-photos-presigned_post-create:
+    handler: app/my/photos/presigned_post/handler.create
+    events:
+      - http:
+          path: my/photos/presigned_post
+          method: post
+          cors: true
+          authorizer: authorize
+
   my-photos-index:
     handler: app/my/photos/handler.index
     events:
