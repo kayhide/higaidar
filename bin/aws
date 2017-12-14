@@ -3,8 +3,6 @@
 abspath="$(cd "${0%/*}" 2>/dev/null; echo "$PWD")"
 app_name=$(basename "$(dirname "$abspath")")
 
-profile="${app_name}-${STAGE:-dev}-deploy"
-
 bin=$(which -a aws | tail -n +2  | head -n 1)
 
 if [ ! ${bin} ]; then
@@ -12,13 +10,38 @@ if [ ! ${bin} ]; then
     exit 1
 fi
 
-cmd=""${bin}" --profile "${profile}" "$@""
+subcmd=$1
+
+if [ $ON_REMOTE ]; then
+    profile="${app_name}-${STAGE:-dev}-deploy"
+    cmd=""${bin}" --profile "${profile}" "$@""
+else
+    case "$subcmd" in
+        apigateway)
+            endpoint="localhost:4567"
+            ;;
+        dynamodb)
+            endpoint="localhost:4569"
+            ;;
+        s3)
+            endpoint="localhost:4572"
+            ;;
+        cloudformation)
+            endpoint="localhost:4581"
+            ;;
+    esac
+    if [ $endpoint ]; then
+        cmd=""${bin}" --endpoint-url "http://${endpoint}" "$@""
+    else
+        cmd=""${bin}" "$@""
+    fi
+fi
+
 
 GRAY='\033[0;30m'
 NO_COLOR='\033[0m'
 
 if [ -t 1 ]; then
-    echo "Profile: $profile"
     echo -e "${GRAY}$ "${cmd}"${NO_COLOR}"
     echo
 fi
