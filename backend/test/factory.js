@@ -16,8 +16,8 @@ const factory = {
   photo: function *() {
     for (let i = 1;; ++i) {
       yield {
-        is_uploaded: false,
-        original_url: `http://higaidar.test/photo-${i}.jpg`,
+        key: `${100 + i}/photo-${i}.jpg`,
+        original_url: `http://higaidar.test/${100 + i}/photo-${i}.jpg`,
         thumbnail_url: null
       }
     };

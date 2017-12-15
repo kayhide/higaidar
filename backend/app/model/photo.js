@@ -4,7 +4,7 @@ const Sequelize = require('sequelize');
 
 module.exports.define = (sequelize) =>
   sequelize.define('photo', {
-    is_uploaded: { type: Sequelize.BOOLEAN },
+    key: { type: Sequelize.STRING },
     original_url: { type: Sequelize.STRING },
     thumbnail_url: { type: Sequelize.STRING }
   }, {
