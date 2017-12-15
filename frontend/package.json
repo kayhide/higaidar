@@ -27,6 +27,6 @@
     "browser-sync": "browser-sync start --server --ss dist/dev --files dist/dev --no-ui --no-notify",
     "dev": "concurrently \"yarn run watch\" \"yarn run browser-sync\"",
     "browse": "rake browse",
-    "deploy": "rake s3:deploy"
+    "deploy": "DEPLOYING=1 yarn run build && rake s3:deploy"
   }
 }

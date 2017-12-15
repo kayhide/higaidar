@@ -14,13 +14,13 @@ helper.verifyStage(process.env.STAGE);
 
 const output_dir = path.resolve(__dirname, 'dist', process.env.STAGE)
 
-const nameWith = (env => {
-  if (env === 'prod') {
+const nameWith = (deploying => {
+  if (deploying) {
     return (pre, suf) => `${pre}.[hash]${suf}`;
   } else {
     return (pre, suf) => `${pre}${suf}`;
   };
-}) (process.env.STAGE);
+}) (process.env.DEPLOYING);
 
 const entries = {
   regular: {
