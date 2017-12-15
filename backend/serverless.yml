@@ -19,6 +19,7 @@ provider:
         - s3:PutObjectACL
       Resource:
         - "arn:aws:s3:::${self:provider.environment.RESOURCE_PREFIX}photos/*"
+        - "arn:aws:s3:::${self:provider.environment.RESOURCE_PREFIX}photos-thumbnail/*"
   environment:
     STAGE: ${self:provider.stage}
     RESOURCE_PREFIX: ${self:service}-${self:provider.stage}-
@@ -164,6 +165,14 @@ functions:
           cors: true
           authorizer: authorize
 
+
+  photos-accept:
+    handler: app/photos/handler.accept
+    events:
+      - s3:
+          bucket: photos
+          event: s3:ObjectCreated:*
+
 resources:
   Resources:
     S3BucketPhotos:
@@ -191,3 +200,17 @@ resources:
                 - HEAD
               AllowedOrigins:
                 - "*"
+
+
+    PhotosDashacceptLambdaPermissionPhotosS3:
+      Type: "AWS::Lambda::Permission"
+      Properties:
+        FunctionName:
+          Fn::GetAtt:
+            - PhotosDashacceptLambdaFunction
+            - Arn
+        Principal: "s3.amazonaws.com"
+        Action: "lambda:InvokeFunction"
+        SourceAccount:
+          Ref: AWS::AccountId
+        SourceArn: "arn:aws:s3:::${self:provider.environment.RESOURCE_PREFIX}photos"
