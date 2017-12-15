@@ -5,6 +5,7 @@ import Prelude
 import Api as Api
 import Component.General.Route as R
 import Component.LoginUI as LoginUI
+import Component.MyPhotoListUI as MyPhotoListUI
 import Component.NoticeUI as NoticeUI
 import Component.UploadUI as UploadUI
 import Control.Monad.Aff (Aff, launchAff_)
@@ -12,8 +13,8 @@ import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Now (NOW)
 import Control.Monad.Eff.Now as Now
 import Data.DateTime.Locale (Locale(..), LocaleName(..))
-import Data.Either.Nested (Either3)
-import Data.Functor.Coproduct.Nested (Coproduct3)
+import Data.Either.Nested (Either4)
+import Data.Functor.Coproduct.Nested (Coproduct4)
 import Data.Maybe (Maybe(Just, Nothing))
 import Data.Time.Duration (Minutes(..))
 import Dom.Storage (STORAGE)
@@ -38,6 +39,7 @@ data Query a
   | HandleNotice NoticeUI.Message a
   | HandleLogin LoginUI.Message a
   | HandleUpload UploadUI.Message a
+  | HandleMyPhotoList MyPhotoListUI.Message a
   | Goto R.Location a
 
 type State =
@@ -52,8 +54,8 @@ type Input = AppConfig
 
 type Message = Void
 
-type ChildQuery = Coproduct3 NoticeUI.Query LoginUI.Query UploadUI.Query
-type ChildSlot = Either3 NoticeUI.Slot LoginUI.Slot UploadUI.Slot
+type ChildQuery = Coproduct4 NoticeUI.Query LoginUI.Query UploadUI.Query MyPhotoListUI.Query
+type ChildSlot = Either4 NoticeUI.Slot LoginUI.Slot UploadUI.Slot MyPhotoListUI.Slot
 
 cpNotice :: CP.ChildPath NoticeUI.Query ChildQuery NoticeUI.Slot ChildSlot
 cpNotice = CP.cp1
@@ -63,6 +65,9 @@ cpLogin = CP.cp2
 
 cpUpload :: CP.ChildPath UploadUI.Query ChildQuery UploadUI.Slot ChildSlot
 cpUpload = CP.cp3
+
+cpMyPhotoList :: CP.ChildPath MyPhotoListUI.Query ChildQuery MyPhotoListUI.Slot ChildSlot
+cpMyPhotoList = CP.cp4
 
 type Eff_ eff = Aff (ajax :: AJAX, now :: NOW, storage :: STORAGE | eff)
 
@@ -164,7 +169,11 @@ render state =
 
       R.Home ->
         withAuthentication
-        $ HH.slot' cpUpload UploadUI.Slot UploadUI.ui { client } $ HE.input HandleUpload
+        $ HH.div_
+        [
+          HH.slot' cpUpload UploadUI.Slot UploadUI.ui { client } $ HE.input HandleUpload
+        , HH.slot' cpMyPhotoList MyPhotoListUI.Slot MyPhotoListUI.ui { client, locale } $ HE.input HandleMyPhotoList
+        ]
 
     withAuthentication html =
       if Api.isAuthenticated client
@@ -197,6 +206,10 @@ eval = case _ of
     pure next
 
   HandleUpload (UploadUI.Failed s) next -> do
+    postAlert s
+    pure next
+
+  HandleMyPhotoList (MyPhotoListUI.Failed s) next -> do
     postAlert s
     pure next
 
