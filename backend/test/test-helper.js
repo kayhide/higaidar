@@ -6,7 +6,10 @@ const fs = require('fs-extra');
 const path = require('path');
 const _ = require('lodash');
 const yaml = require('js-yaml');
+const mime = require('mime-types');
 const co = require('co');
+const promisify = require('util.promisify');
+const stream = require('stream');
 const nock = require('nock');
 const Sequelize = require('sequelize');
 
@@ -61,3 +64,54 @@ const comparablify = (x) => {
 module.exports.isEqualModel = (x, y) => {
   return _.isEqual(comparablify(x), comparablify(y));
 };
+
+module.exports.setS3File = (s3, bucket, key, file) => {
+  return co(function *() {
+    const b = yield exists(s3, bucket, key);
+    if (!b) {
+      yield upload(s3, bucket, key, file);
+    }
+  });
+}
+
+module.exports.unsetS3File = (s3, bucket, key) => {
+  return co(function *() {
+    const b = yield exists(s3, bucket, key);
+    if (b) {
+      yield unload(s3, bucket, key);
+    }
+  });
+}
+
+const upload = (s3, bucket, key, file) => {
+  const pass = stream.PassThrough();
+  const params = {
+    Bucket: bucket,
+    Key: key,
+    Body: pass,
+    ContentType: mime.lookup(file),
+    ACL: 'public-read'
+  };
+  fs.createReadStream(fixture.join(file)).pipe(pass);
+  return promisify(s3.upload.bind(s3))(params)
+};
+module.exports.upload = upload;
+
+const unload = (s3, bucket, key) => {
+  const params = {
+    Bucket: bucket,
+    Key: key
+  };
+  return promisify(s3.deleteObject.bind(s3))(params)
+};
+module.exports.unload = unload;
+
+const exists = (s3, bucket, key) => {
+  const params = {
+    Bucket: bucket,
+    Key: key
+  };
+  return promisify(s3.headObject.bind(s3))(params)
+    .then(() => Promise.resolve(true), () => Promise.resolve(false));
+};
+module.exports.exists = exists;

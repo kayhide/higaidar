@@ -22,6 +22,8 @@ provider:
   environment:
     STAGE: ${self:provider.stage}
     RESOURCE_PREFIX: ${self:service}-${self:provider.stage}-
+    PHOTOS_LOCATION: "https://${self:provider.environment.RESOURCE_PREFIX}photos.s3.${self:provider.region}.amazonaws.com/"
+    PHOTOS_THUMBNAIL_LOCATION: "https://${self:provider.environment.RESOURCE_PREFIX}photos-thumbnail.s3.${self:provider.region}.amazonaws.com/"
     AWS_RDS_REGION: ${self:provider.region}
     AWS_RDS_HOST: ${self:custom.rds.HOST}
     AWS_RDS_PORT: ${self:custom.rds.PORT}
@@ -169,6 +171,19 @@ resources:
       # DeletionPolicy: Retain
       Properties:
         BucketName: ${self:provider.environment.RESOURCE_PREFIX}photos
+        CorsConfiguration:
+          CorsRules:
+            - AllowedMethods:
+                - GET
+                - HEAD
+              AllowedOrigins:
+                - "*"
+
+    S3BucketPhotosThumbnail:
+      Type: "AWS::S3::Bucket"
+      # DeletionPolicy: Retain
+      Properties:
+        BucketName: ${self:provider.environment.RESOURCE_PREFIX}photos-thumbnail
         CorsConfiguration:
           CorsRules:
             - AllowedMethods:
