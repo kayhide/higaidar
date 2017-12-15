@@ -16,7 +16,7 @@ import DOM.File.FileList as FileList
 import DOM.File.Types (fileToBlob)
 import DOM.HTML.HTMLInputElement as DOM
 import DOM.HTML.Indexed.InputType as InputType
-import DOM.HTML.Types (HTMLInputElement)
+import Data.Array as Array
 import Data.Either (Either(..), either, hush)
 import Data.Lens (set)
 import Data.Maybe (Maybe(Nothing, Just), maybe)
@@ -44,9 +44,7 @@ type Config =
 type State =
   { config :: Config
   , busy :: Boolean
-  , filename :: Maybe String
-  , signed_url :: Maybe URL
-  , url :: Maybe URL
+  , urls :: Array URL
   }
 
 data Query a
@@ -67,9 +65,7 @@ ui =
   H.lifecycleComponent
     { initialState: { config: _
                     , busy: false
-                    , filename: Nothing
-                    , signed_url: Nothing
-                    , url: Nothing
+                    , urls: []
                     }
     , render
     , eval
@@ -86,7 +82,7 @@ render state =
     [ HH.text "Upload" ]
   , LoadingIndicator.render state.busy
   , renderForm
-  , renderImage
+  , HH.div_ $ renderImage <$> state.urls
   ]
 
   where
@@ -104,14 +100,11 @@ render state =
         ]
       ]
 
-    renderImage = case state.url of
-      Just url ->
-        HH.img
-        [ HP.class_ $ H.ClassName "img-fluid"
-        , HP.src url
-        ]
-      Nothing ->
-        HH.div_ []
+    renderImage url =
+      HH.img
+      [ HP.class_ $ H.ClassName "img-fluid"
+      , HP.src url
+      ]
 
 
 eval :: forall eff. Query ~> H.ComponentDSL State Query Message (Eff_ eff)
@@ -123,32 +116,34 @@ eval = case _ of
     let elm = unsafeCoerce $ Event.target e
     let files = unsafePerformEff $ DOM.files elm
     let file = join $ FileList.item 0 <$> files
-    H.modify _{ filename = File.name <$> file }
 
     whenNotBusy do
       res <- runExceptT do
-        blob <- fileToBlob <$> maybe (throwError "File not set") pure file
-        signed_url <- getSignedUrl
+        blob <- maybe (throwError "File not set") (pure <<< fileToBlob) file
+        filename <- maybe (throwError "File not set") (pure <<< File.name) file
+        signed_url <- getSignedUrl filename
         void $ onLeft "Failed to upload"
           =<< (H.liftAff $ attempt $ Affjax.put_ signed_url blob)
         pure signed_url
 
       case res of
         Right signed_url -> do
-          H.modify _{ signed_url = Just signed_url }
           let uri = URI.parse signed_url
               url = URI.print <<< set _query Nothing <<< set _fragment Nothing <$> hush uri
-          H.modify _{ url = url }
-          pure unit
+          case url of
+            Just url_ -> do
+              urls <- Array.cons url_ <$> H.gets _.urls
+              H.modify _{ urls = urls }
+            Nothing ->
+              pure unit
         Left _ -> pure unit
 
     pure next
 
 
-getSignedUrl :: forall eff. ExceptT String (H.ComponentDSL State Query Message (Eff_ eff)) URL
-getSignedUrl = do
+getSignedUrl :: forall eff. String -> ExceptT String (H.ComponentDSL State Query Message (Eff_ eff)) URL
+getSignedUrl filename = do
     cli <- lift $ H.gets _.config.client
-    filename <- maybe (throwError "File not set") pure =<< H.gets _.filename
     onLeft "Failed to issue signed url"
       =<< (H.liftAff $ attempt $ PhotosSigneUrl.create cli filename)
 
