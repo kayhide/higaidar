@@ -139,9 +139,11 @@ eval = case _ of
             Just url_ -> do
               urls <- Array.cons url_ <$> H.gets _.urls
               H.modify _{ urls = urls }
+              H.raise $ Uploaded url_
             Nothing ->
-              pure unit
-        Left _ -> pure unit
+              H.raise $ Failed "Bad url"
+        Left msg ->
+          H.raise $ Failed msg
 
     pure next
 
