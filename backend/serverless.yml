@@ -102,6 +102,33 @@ functions:
           cors: true
           authorizer: authorize
 
+  pests-index:
+    handler: app/pests/handler.index
+    events:
+      - http:
+          path: pests
+          method: get
+          cors: true
+          authorizer: authorize
+
+  pests-create:
+    handler: app/pests/handler.create
+    events:
+      - http:
+          path: pests
+          method: post
+          cors: true
+          authorizer: authorize
+
+  pests-destroy:
+    handler: app/pests/handler.destroy
+    events:
+      - http:
+          path: pests/{id}
+          method: delete
+          cors: true
+          authorizer: authorize
+
   my-photos-signed_url-create:
     handler: app/my/photos/signed_url/handler.create
     events:
