@@ -21,6 +21,13 @@ const factory = {
         thumbnail_url: null
       }
     };
+  },
+  pest: function *() {
+    for (let i = 1;; ++i) {
+      yield {
+        label: `Pest ${i}`
+      }
+    };
   }
 };
 

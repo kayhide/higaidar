@@ -31,7 +31,8 @@ module.exports.with = (f) => {
 const load = (sequelize) => {
   const defs = {
     User: require('app/model/user'),
-    Photo: require('app/model/photo')
+    Photo: require('app/model/photo'),
+    Pest: require('app/model/pest')
   };
 
   const m = _.mapValues(defs, d => d.define(sequelize));
