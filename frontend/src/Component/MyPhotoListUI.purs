@@ -6,21 +6,21 @@ import Api as Api
 import Api.My.Photos as Photos
 import Component.HTML.LoadingIndicator as LoadingIndicator
 import Component.Util as Util
-import Control.Monad.Aff (Aff, attempt)
-import Control.Monad.Except (ExceptT, throwError)
+import Control.Monad.Aff (Aff, Milliseconds(..), attempt, delay)
 import Data.Array as Array
 import Data.DateTime as DateTime
 import Data.DateTime.Locale (Locale(..))
 import Data.Either (Either(Left, Right), either)
 import Data.Formatter.DateTime (formatDateTime)
 import Data.Lens (view)
-import Data.Maybe (Maybe(Nothing, Just), maybe)
+import Data.Maybe (Maybe(Nothing, Just), isJust, maybe)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Properties as HP
-import Model.Photo (Photo(..), PhotoId)
+import Halogen.Query.HalogenM as HM
+import Model.Photo (Photo(..), PhotoId, _original_url, _thumbnail_url)
 import Model.Photo as Photo
-import Network.HTTP.Affjax (AJAX)
+import Network.HTTP.Affjax (AJAX, URL)
 
 
 data Slot = Slot
@@ -32,9 +32,11 @@ data Query a
   = Initialize a
   | Reload a
   | Destroy PhotoId a
+  | PushLoadingItem URL a
 
 type State =
   { items :: Array Photo
+  , loadingItems :: Array URL
   , client :: Api.Client
   , locale :: Locale
   , busy :: Boolean
@@ -65,6 +67,7 @@ ui =
 initialState :: Input -> State
 initialState { client, locale } =
     { items: []
+    , loadingItems: []
     , client
     , locale
     , busy: false
@@ -79,15 +82,29 @@ render state =
   , LoadingIndicator.render state.busy
   , HH.div
     [ HP.class_ $ H.ClassName "row no-gutters" ]
-    $ renderItem <$> state.items
+    $ (renderLoadingItem <$> state.loadingItems) <> (renderItem <$> state.items)
   ]
 
   where
+    renderLoadingItem url =
+      HH.div
+      [ HP.classes [ H.ClassName "col-md-2", H.ClassName "col-sm-4", H.ClassName "col-6" ] ]
+      [ HH.div
+        [ HP.classes [ H.ClassName "card h-100" ] ]
+        [
+          HH.div
+          [ HP.classes [ H.ClassName "card-body text-center" ] ]
+          [
+            HH.i [ HP.class_ $ H.ClassName "fa fa-spinner fa-pulse fa-3x" ] []
+          ]
+        ]
+      ]
+
     renderItem (Photo { id, original_url, thumbnail_url, created_at }) =
       HH.div
       [ HP.classes [ H.ClassName "col-md-2", H.ClassName "col-sm-4", H.ClassName "col-6" ] ]
       [ HH.div
-        [ HP.classes [ H.ClassName "card", H.ClassName "mb-2" ] ]
+        [ HP.classes [ H.ClassName "card h-100" ] ]
         [
           HH.a
           [ HP.href original_url, HP.target "_blank" ]
@@ -106,13 +123,12 @@ render state =
 
     renderThumbnail = case _ of
       Just url ->
-        HH.img [ HP.src url, HP.class_ $ H.ClassName "card-img-top" ]
-      Nothing ->
-        HH.div
-        [ HP.class_ $ H.ClassName "card-img-top" ]
-        [
-          HH.i [ HP.class_ $ H.ClassName "fa fa-loading" ] []
+        HH.img
+        [ HP.src url
+        , HP.class_ $ H.ClassName "card-img-top"
         ]
+      Nothing ->
+        HH.div_ []
 
     renderDateTime dt (Locale _ dur) =
       HH.text $ either id id $ maybe (Left "") (formatDateTime "YYYY/MM/DD HH:mm:ss") dt_
@@ -122,7 +138,7 @@ render state =
 eval :: forall eff. Query ~> H.ComponentDSL State Query Message (Eff_ eff)
 eval = case _ of
   Initialize next -> do
-    cli <- H.gets _.client
+    void $ HM.fork runPoller
     eval $ Reload next
 
   Reload next -> do
@@ -155,5 +171,31 @@ eval = case _ of
       H.modify _{ busy = false }
     pure next
 
-onLeft :: forall e m. Monad m => String -> Either e ~> ExceptT String m
-onLeft s = either (throwError <<< const s) pure
+  PushLoadingItem url next -> do
+    loadingItems <- Array.cons url <$> H.gets _.loadingItems
+    H.modify _{ loadingItems = loadingItems }
+    pure next
+
+
+runPoller :: forall eff. H.ComponentDSL State Query Message (Eff_ eff) Unit
+runPoller = do
+  H.liftAff $ delay (Milliseconds 1000.0)
+  loadingItems <- H.gets _.loadingItems
+  case loadingItems of
+    [] -> pure unit
+    urls -> do
+      cli <- H.gets _.client
+      photos <- H.liftAff $ attempt $ Photos.index cli
+
+      case photos of
+        Right photos_ -> do
+          let photos__ =
+                Array.filter (isJust <<< view _thumbnail_url)
+                $ Array.filter (flip Array.elem urls <<< view _original_url) photos_
+              loadingItems_ = Array.difference loadingItems $ view _original_url <$> photos__
+
+          items <- append photos__ <$> H.gets _.items
+          H.modify _{ items = items, loadingItems = loadingItems_ }
+        Left _ ->
+          pure unit
+  runPoller

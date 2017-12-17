@@ -203,6 +203,7 @@ eval = case _ of
 
   HandleUpload (UploadUI.Uploaded url) next -> do
     postInfo "Uploaded."
+    void $ H.query' cpMyPhotoList MyPhotoListUI.Slot $ H.action $ MyPhotoListUI.PushLoadingItem url
     pure next
 
   HandleUpload (UploadUI.Failed s) next -> do

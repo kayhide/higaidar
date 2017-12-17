@@ -16,7 +16,6 @@ import DOM.File.FileList as FileList
 import DOM.File.Types (fileToBlob)
 import DOM.HTML.HTMLInputElement as DOM
 import DOM.HTML.Indexed.InputType as InputType
-import Data.Array as Array
 import Data.Either (Either(..), either, hush)
 import Data.Lens (set)
 import Data.Maybe (Maybe(Nothing, Just), maybe)
@@ -44,7 +43,6 @@ type Config =
 type State =
   { config :: Config
   , busy :: Boolean
-  , urls :: Array URL
   }
 
 data Query a
@@ -65,7 +63,6 @@ ui =
   H.lifecycleComponent
     { initialState: { config: _
                     , busy: false
-                    , urls: []
                     }
     , render
     , eval
@@ -78,11 +75,8 @@ render :: State -> H.ComponentHTML Query
 render state =
   HH.div_
   [
-    HH.h1_
-    [ HH.text "Upload" ]
-  , LoadingIndicator.render state.busy
+    LoadingIndicator.render state.busy
   , renderUploadButton
-  , HH.div_ $ renderImage <$> state.urls
   ]
 
   where
@@ -104,13 +98,6 @@ render state =
           HH.i [ HP.class_ $ H.ClassName "fa fa-plus" ] []
         ]
       ]
-
-    renderImage url =
-      HH.img
-      [ HP.class_ $ H.ClassName "img-fluid"
-      , HP.src url
-      ]
-
 
 eval :: forall eff. Query ~> H.ComponentDSL State Query Message (Eff_ eff)
 eval = case _ of
@@ -135,13 +122,7 @@ eval = case _ of
         Right signed_url -> do
           let uri = URI.parse signed_url
               url = URI.print <<< set _query Nothing <<< set _fragment Nothing <$> hush uri
-          case url of
-            Just url_ -> do
-              urls <- Array.cons url_ <$> H.gets _.urls
-              H.modify _{ urls = urls }
-              H.raise $ Uploaded url_
-            Nothing ->
-              H.raise $ Failed "Bad url"
+          H.raise $ maybe (Failed "Bad url") Uploaded url
         Left msg ->
           H.raise $ Failed msg
 
