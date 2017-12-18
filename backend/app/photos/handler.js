@@ -4,6 +4,7 @@ const co = require('co');
 const promisify = require('util.promisify');
 const path = require('path');
 const util = require('util');
+const mime = require('mime-types');
 
 const AWS = require('aws-sdk');
 const s3 = new AWS.S3();
@@ -30,9 +31,9 @@ module.exports.accept = (event, context, callback) => {
     return;
   }
 
-  var imageType = path.extname(key).slice(1);
-  if (imageType != "jpg" && imageType != "png") {
-    callback(`Unsupported image type: ${imageType}`);
+  var mimeType = mime.lookup(key);
+  if (mimeType != "image/jpeg" && mimeType != "image/png") {
+    callback(`Unsupported image type: ${mimeType}`);
     return;
   }
 
@@ -52,7 +53,7 @@ module.exports.accept = (event, context, callback) => {
     const res = yield getObject({ Bucket: srcBucket, Key: key });
 
     const runner = gm(res.Body).resize(200, 200, '^').gravity('Center').extent(200, 200)
-    const buffer = yield promisify(runner.toBuffer.bind(runner))(imageType);
+    const buffer = yield promisify(runner.toBuffer.bind(runner))(mimeType.split('/')[1]);
 
     yield putObject({
       Bucket: dstBucket,

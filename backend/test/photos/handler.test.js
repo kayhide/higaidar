@@ -49,17 +49,12 @@ describe('photos', () => {
     const dstBucket = `${srcBucket}-thumbnail`;
 
     let handle;
-    let key;
     beforeEach(() => {
-      key = `${user.id}/japan/tokyo/nyappori/cute_cat.jpg`;
       handle = promisify(handler.accept.bind(handler));
       event.Records = [{
         s3: {
           bucket: {
             name: srcBucket
-          },
-          object: {
-            key
           }
         }
       }];
@@ -67,8 +62,11 @@ describe('photos', () => {
 
     context('with image', () => {
       const file = 'cute_cat.jpg';
-
+      let key;
       beforeEach(() => co(function *() {
+        key = `${user.id}/japan/tokyo/nyappori/${file}`;
+        event.Records[0].s3.object = { key };
+
         yield helper.setS3File(s3, srcBucket, key, file);
         yield helper.unsetS3File(s3, dstBucket, key);
       }));
@@ -97,6 +95,38 @@ describe('photos', () => {
           assert(photo.original_url === `https://higaidar-test-photos.s3.ap-northeast-1.amazonaws.com/${key}`);
           assert(photo.thumbnail_url === `https://higaidar-test-photos-thumbnail.s3.ap-northeast-1.amazonaws.com/${key}`);
         });
+      });
+    });
+
+    context('with jpeg image', () => {
+      const file = 'sleepy_cat.jpeg';
+      let key;
+      beforeEach(() => co(function *() {
+        key = `${user.id}/japan/tokyo/nyappori/${file}`;
+        event.Records[0].s3.object = { key };
+
+        yield helper.setS3File(s3, srcBucket, key, file);
+        yield helper.unsetS3File(s3, dstBucket, key);
+      }));
+
+      it('works', () => {
+        return handle(event, {});
+      });
+    });
+
+    context('with png image', () => {
+      const file = 'boss.png';
+      let key;
+      beforeEach(() => co(function *() {
+        key = `${user.id}/japan/tokyo/nyappori/${file}`;
+        event.Records[0].s3.object = { key };
+
+        yield helper.setS3File(s3, srcBucket, key, file);
+        yield helper.unsetS3File(s3, dstBucket, key);
+      }));
+
+      it('works', () => {
+        return handle(event, {});
       });
     });
   });
