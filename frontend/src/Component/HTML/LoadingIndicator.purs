@@ -11,5 +11,5 @@ render on =
   HH.div
   [ HP.class_ $ H.ClassName $ "loading-indicator" <> if on then " _on" else "" ]
   [
-    HH.i [ HP.class_ $ H.ClassName "fa fa-spinner fa-pulse fa-3x" ] []
+    HH.i [ HP.class_ $ H.ClassName "fa fa-spinner fa-pulse fa-3x text-warning" ] []
   ]
