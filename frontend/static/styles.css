@@ -62,3 +62,19 @@
     opacity: 1.0;
     z-index: 1000;
 }
+
+.delete-photo-button {
+    transition: 0.5s;
+    -webkit-transition: 0.5s;
+    opacity: 0.0;
+
+    position: absolute;
+    left: 0;
+    width: 100%;
+    z-index: -1;
+}
+
+.delete-photo-button._on {
+    opacity: 1.0;
+    z-index: 1000;
+}

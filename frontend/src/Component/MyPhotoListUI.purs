@@ -153,7 +153,7 @@ render state =
           [
             maybe (HH.div_ []) renderThumbnail thumbnail_url
           ]
-        , if deleting then renderDeleteButton id else HH.div_ []
+        , renderDeleteButton id
         , renderPest photo
         ]
       ]
@@ -166,7 +166,7 @@ render state =
 
     renderDeleteButton id =
       HH.div
-      [ HP.class_ $ H.ClassName "position-absolute w-100" ]
+      [ HP.class_ $ H.ClassName $ "delete-photo-button" <> if deleting then " _on" else "" ]
       [
         HH.div
         [ HP.class_ $ H.ClassName "card-body text-center" ]
