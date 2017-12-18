@@ -7,7 +7,7 @@ $stage = ENV.fetch('STAGE', 'dev')
 raise RuntimeError.new("Invalid STAGE: #{$stage}") unless %w(test dev prod).include?($stage)
 
 $root_dir = __dir__
-$dist_dir = "frontend/dist/#{$stage}"
+$dist_dir = "frontend/dist/#{$stage}-deploy"
 $config_dir = 'config'
 $wrk_dir = '.rake'
 $env_file = ".env.#{$stage}.yml"
@@ -136,7 +136,7 @@ namespace :s3 do
   end
 
   desc 'Deploy public web to S3 bucket'
-  task :deploy => [endpoint] do
+  task :deploy => [$dist_dir, endpoint] do
     say_status :deploy, bucket_uri, :green
     aws ['s3', 'sync',
          "#{$dist_dir}/", bucket_uri,

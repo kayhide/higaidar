@@ -12,7 +12,9 @@ const helper = require('./lib/helper');
 process.env.STAGE = process.env.STAGE || 'dev';
 helper.verifyStage(process.env.STAGE);
 
-const output_dir = path.resolve(__dirname, 'dist', process.env.STAGE)
+const output_dir = path.resolve(__dirname,
+                                'dist',
+                                `${process.env.STAGE}${process.env.DEPLOYING ? "-deploy" : ""}`)
 
 const nameWith = (deploying => {
   if (deploying) {
