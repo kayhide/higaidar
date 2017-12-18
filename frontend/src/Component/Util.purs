@@ -5,8 +5,11 @@ import Prelude
 import Control.Monad.Except (ExceptT, throwError)
 import Control.Monad.State (class MonadState, gets, modify)
 import Data.Either (Either, either)
-import Data.Maybe (Maybe(Just, Nothing))
+import Data.Maybe (Maybe(Just, Nothing), maybe)
 
+
+onNothing :: forall m. Monad m => String -> Maybe ~> ExceptT String m
+onNothing s = maybe (throwError s) pure
 
 onLeft :: forall e m. Monad m => String -> Either e ~> ExceptT String m
 onLeft s = either (throwError <<< const s) pure

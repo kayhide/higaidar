@@ -154,10 +154,6 @@ render state =
     locale = state.locale
     isAuthenticated = Api.isAuthenticated client
 
-    updateButtonClass =
-      "btn btn-outline-primary mb-2"
-      <> if isAuthenticated then "" else " disabled"
-
     renderUserName = case client of
       Api.Client { user: Just (User { name }) } ->
         HH.span
@@ -167,23 +163,27 @@ render state =
         HH.span_ []
 
     renderPage = case _ of
-      R.Home -> withAuthentication
-                $ HH.p_ [ HH.text $ "Home" ]
+      R.Home ->
+        withAuthentication
+        $ HH.p_ [ HH.text $ "Home" ]
 
       R.Login ->
-        HH.slot' cpLogin LoginUI.Slot LoginUI.ui { endpoint } $ HE.input HandleLogin
+        HH.slot' cpLogin LoginUI.Slot LoginUI.ui { endpoint, isAuthenticated } $ HE.input HandleLogin
 
-      R.UsersIndex -> withAuthentication
+      R.UsersIndex ->
+        withAuthentication
         $ HH.slot' cpUserList UserListUI.Slot UserListUI.ui { client, locale } $ HE.input HandleUserList
 
-      R.UsersShow userId -> withAuthentication
+      R.UsersShow userId ->
+        withAuthentication
         $ HH.slot' cpUserShow UserShowUI.Slot UserShowUI.ui { userId, client, locale } $ HE.input HandleUserShow
 
-      R.PestsIndex -> withAuthentication
+      R.PestsIndex ->
+        withAuthentication
         $ HH.slot' cpPestList PestListUI.Slot PestListUI.ui { client, locale } $ HE.input HandlePestList
 
     withAuthentication html =
-      if Api.isAuthenticated client
+      if isAuthenticated
       then html
       else HH.text $ "Not authenticated"
 
@@ -192,7 +192,7 @@ eval = case _ of
   Initialize next -> do
     locale <- H.liftEff Now.locale
     H.modify _{ locale = locale }
-    eval $ Goto R.Home next
+    pure next
 
   HandleNotice (NoticeUI.Closed i) next -> do
     pure next

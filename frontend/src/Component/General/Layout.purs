@@ -157,7 +157,7 @@ render state =
 
     renderPage = case _ of
       R.Login ->
-        HH.slot' cpLogin LoginUI.Slot LoginUI.ui { endpoint } $ HE.input HandleLogin
+        HH.slot' cpLogin LoginUI.Slot LoginUI.ui { endpoint, isAuthenticated } $ HE.input HandleLogin
 
       R.Home ->
         withAuthentication
@@ -177,7 +177,7 @@ eval = case _ of
   Initialize next -> do
     locale <- H.liftEff Now.locale
     H.modify _{ locale = locale }
-    eval $ Goto R.Home next
+    pure next
 
   HandleNotice (NoticeUI.Closed i) next -> do
     pure next
