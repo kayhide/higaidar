@@ -7,20 +7,19 @@ import Component.General.Route as R
 import Component.LoginUI as LoginUI
 import Component.MyPhotoListUI as MyPhotoListUI
 import Component.NoticeUI as NoticeUI
-import Component.UploadUI as UploadUI
 import Control.Monad.Aff (Aff, launchAff_)
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Now (NOW)
 import Control.Monad.Eff.Now as Now
+import Data.Const (Const)
 import Data.DateTime.Locale (Locale(..), LocaleName(..))
-import Data.Either.Nested (Either4)
-import Data.Functor.Coproduct.Nested (Coproduct4)
 import Data.Maybe (Maybe(Just, Nothing))
 import Data.Time.Duration (Minutes(..))
 import Dom.Storage (STORAGE)
 import Halogen as H
 import Halogen.Aff as HA
 import Halogen.Component.ChildPath as CP
+import Halogen.Data.Prism (type (<\/>), type (\/))
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
@@ -38,7 +37,6 @@ data Query a
   = Initialize a
   | HandleNotice NoticeUI.Message a
   | HandleLogin LoginUI.Message a
-  | HandleUpload UploadUI.Message a
   | HandleMyPhotoList MyPhotoListUI.Message a
   | Goto R.Location a
 
@@ -54,8 +52,17 @@ type Input = AppConfig
 
 type Message = Void
 
-type ChildQuery = Coproduct4 NoticeUI.Query LoginUI.Query UploadUI.Query MyPhotoListUI.Query
-type ChildSlot = Either4 NoticeUI.Slot LoginUI.Slot UploadUI.Slot MyPhotoListUI.Slot
+type ChildQuery
+  = NoticeUI.Query
+    <\/> LoginUI.Query
+    <\/> MyPhotoListUI.Query
+    <\/> Const Void
+
+type ChildSlot
+  = NoticeUI.Slot
+    \/ LoginUI.Slot
+    \/ MyPhotoListUI.Slot
+    \/ Void
 
 cpNotice :: CP.ChildPath NoticeUI.Query ChildQuery NoticeUI.Slot ChildSlot
 cpNotice = CP.cp1
@@ -63,11 +70,8 @@ cpNotice = CP.cp1
 cpLogin :: CP.ChildPath LoginUI.Query ChildQuery LoginUI.Slot ChildSlot
 cpLogin = CP.cp2
 
-cpUpload :: CP.ChildPath UploadUI.Query ChildQuery UploadUI.Slot ChildSlot
-cpUpload = CP.cp3
-
 cpMyPhotoList :: CP.ChildPath MyPhotoListUI.Query ChildQuery MyPhotoListUI.Slot ChildSlot
-cpMyPhotoList = CP.cp4
+cpMyPhotoList = CP.cp3
 
 type Eff_ eff = Aff (ajax :: AJAX, now :: NOW, storage :: STORAGE | eff)
 
@@ -161,11 +165,7 @@ render state =
 
       R.Home ->
         withAuthentication
-        $ HH.div_
-        [
-          HH.slot' cpUpload UploadUI.Slot UploadUI.ui { client } $ HE.input HandleUpload
-        , HH.slot' cpMyPhotoList MyPhotoListUI.Slot MyPhotoListUI.ui { client, locale } $ HE.input HandleMyPhotoList
-        ]
+        $ HH.slot' cpMyPhotoList MyPhotoListUI.Slot MyPhotoListUI.ui { client, locale } $ HE.input HandleMyPhotoList
 
     withAuthentication html =
       if Api.isAuthenticated client
@@ -190,15 +190,6 @@ eval = case _ of
 
   HandleLogin (LoginUI.Failed client _ s) next -> do
     H.modify _{ apiClient = client }
-    postAlert s
-    pure next
-
-  HandleUpload (UploadUI.Uploaded url) next -> do
-    postInfo "Uploaded."
-    void $ H.query' cpMyPhotoList MyPhotoListUI.Slot $ H.action $ MyPhotoListUI.PushLoadingItem url
-    pure next
-
-  HandleUpload (UploadUI.Failed s) next -> do
     postAlert s
     pure next
 

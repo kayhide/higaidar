@@ -5,6 +5,7 @@ import Prelude
 import Api as Api
 import Api.My.Photos as Photos
 import Component.HTML.LoadingIndicator as LoadingIndicator
+import Component.UploadUI as UploadUI
 import Component.Util as Util
 import Control.Monad.Aff (Aff, Milliseconds(..), attempt, delay)
 import Data.Array as Array
@@ -16,6 +17,7 @@ import Data.Lens (view)
 import Data.Maybe (Maybe(Nothing, Just), isJust, maybe)
 import Halogen as H
 import Halogen.HTML as HH
+import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Query.HalogenM as HM
 import Model.Photo (Photo(..), PhotoId, _original_url, _thumbnail_url)
@@ -33,6 +35,7 @@ data Query a
   | Reload a
   | Destroy PhotoId a
   | PushLoadingItem URL a
+  | HandleUpload UploadUI.Message a
 
 type State =
   { items :: Array Photo
@@ -50,30 +53,31 @@ type Input =
 data Message
   = Failed String
 
+type ChildQuery = UploadUI.Query
+type ChildSlot = UploadUI.Slot
 
 type Eff_ eff = Aff (ajax :: AJAX | eff)
 
 ui :: forall eff. H.Component HH.HTML Query Input Message (Eff_ eff)
 ui =
-  H.lifecycleComponent
-    { initialState: initialState
+  H.lifecycleParentComponent
+    { initialState
     , render
     , eval
     , receiver: const Nothing
     , initializer: Just $ H.action Initialize
     , finalizer: Nothing
     }
+  where
+    initialState { client, locale } =
+      { items: []
+      , loadingItems: []
+      , client
+      , locale
+      , busy: false
+      }
 
-initialState :: Input -> State
-initialState { client, locale } =
-    { items: []
-    , loadingItems: []
-    , client
-    , locale
-    , busy: false
-    }
-
-render :: State -> H.ComponentHTML Query
+render :: forall eff. State -> H.ParentHTML Query ChildQuery ChildSlot (Eff_ eff)
 render state =
   HH.div_
   [
@@ -82,18 +86,36 @@ render state =
   , LoadingIndicator.render state.busy
   , HH.div
     [ HP.class_ $ H.ClassName "row no-gutters" ]
-    $ (renderLoadingItem <$> state.loadingItems) <> (renderItem <$> state.items)
+    $ [ renderUploadUI ]
+    <> (renderLoadingItem <$> state.loadingItems)
+    <> (renderItem <$> state.items)
   ]
 
   where
-    renderLoadingItem url =
+    client = state.client
+
+    renderUploadUI =
       HH.div
-      [ HP.classes [ H.ClassName "col-md-2", H.ClassName "col-sm-4", H.ClassName "col-6" ] ]
+      [ HP.class_ $ H.ClassName "col-md-2 col-sm-4 col-6 pb-2" ]
       [ HH.div
-        [ HP.classes [ H.ClassName "card h-100" ] ]
+        [ HP.class_ $ H.ClassName "card" ]
         [
           HH.div
-          [ HP.classes [ H.ClassName "card-body text-center" ] ]
+          [ HP.class_ $ H.ClassName "card-body text-center" ]
+          [
+            HH.slot UploadUI.Slot UploadUI.ui { client } $ HE.input HandleUpload
+          ]
+        ]
+      ]
+
+    renderLoadingItem url =
+      HH.div
+      [ HP.class_ $ H.ClassName "col-md-2 col-sm-4 col-6 pb-2" ]
+      [ HH.div
+        [ HP.class_ $ H.ClassName "card" ]
+        [
+          HH.div
+          [ HP.class_ $ H.ClassName "card-body text-center" ]
           [
             HH.i [ HP.class_ $ H.ClassName "fa fa-spinner fa-pulse fa-3x" ] []
           ]
@@ -102,9 +124,9 @@ render state =
 
     renderItem (Photo { id, original_url, thumbnail_url, created_at }) =
       HH.div
-      [ HP.classes [ H.ClassName "col-md-2", H.ClassName "col-sm-4", H.ClassName "col-6" ] ]
+      [ HP.class_ $ H.ClassName "col-md-2 col-sm-4 col-6 pb-2" ]
       [ HH.div
-        [ HP.classes [ H.ClassName "card h-100" ] ]
+        [ HP.class_ $ H.ClassName "card" ]
         [
           HH.a
           [ HP.href original_url, HP.target "_blank" ]
@@ -112,10 +134,10 @@ render state =
             renderThumbnail thumbnail_url
           ]
         , HH.div
-          [ HP.classes [ H.ClassName "card-body" ] ]
+          [ HP.class_ $ H.ClassName "card-body" ]
           [
             HH.p
-            [ HP.classes [ H.ClassName "card-text", H.ClassName "text-muted", H.ClassName "small" ] ]
+            [ HP.class_ $ H.ClassName "card-text text-muted small" ]
             [ renderDateTime created_at state.locale ]
           ]
         ]
@@ -135,7 +157,7 @@ render state =
       where
         dt_ = (DateTime.adjust (negate dur)) dt
 
-eval :: forall eff. Query ~> H.ComponentDSL State Query Message (Eff_ eff)
+eval :: forall eff. Query ~> H.ParentDSL State Query ChildQuery ChildSlot Message (Eff_ eff)
 eval = case _ of
   Initialize next -> do
     void $ HM.fork runPoller
@@ -172,12 +194,18 @@ eval = case _ of
     pure next
 
   PushLoadingItem url next -> do
+    pure next
+
+  HandleUpload (UploadUI.Uploaded url) next -> do
     loadingItems <- Array.cons url <$> H.gets _.loadingItems
     H.modify _{ loadingItems = loadingItems }
     pure next
 
+  HandleUpload (UploadUI.Failed s) next -> do
+    H.raise $ Failed s
+    pure next
 
-runPoller :: forall eff. H.ComponentDSL State Query Message (Eff_ eff) Unit
+runPoller :: forall eff. H.ParentDSL State Query ChildQuery ChildSlot Message (Eff_ eff) Unit
 runPoller = do
   H.liftAff $ delay (Milliseconds 1000.0)
   loadingItems <- H.gets _.loadingItems

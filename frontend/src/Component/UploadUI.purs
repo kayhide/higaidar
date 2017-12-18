@@ -80,24 +80,31 @@ render state =
   ]
 
   where
-    buttonClass =
-      "btn " <> if state.busy then "btn-secondary" else "btn-outline-secondary"
-
-    renderUploadButton =
-      HH.label_
-      [
-        HH.input
-        [ HP.class_ $ H.ClassName "d-none"
-        , HP.type_ InputType.InputFile
-        , HP.accept $ MediaType "image/*"
-        , HE.onChange $ HE.input SetFile
-        ]
-      , HH.span
-        [ HP.class_ $ H.ClassName "btn btn-success rounded-circle" ]
+    renderUploadButton = case state.busy of
+      false ->
+        HH.label_
         [
-          HH.i [ HP.class_ $ H.ClassName "fa fa-plus" ] []
+          HH.input
+          [ HP.class_ $ H.ClassName "d-none"
+          , HP.type_ InputType.InputFile
+          , HP.accept $ MediaType "image/*"
+          , HE.onChange $ HE.input SetFile
+          ]
+        , HH.span
+          [ HP.class_ $ H.ClassName "btn btn-success rounded-circle" ]
+          [
+            HH.i [ HP.class_ $ H.ClassName "fa fa-plus" ] []
+          ]
         ]
-      ]
+      true ->
+        HH.div_
+        [
+          HH.span
+          [ HP.class_ $ H.ClassName "btn btn-secondary rounded-circle disabled" ]
+          [
+            HH.i [ HP.class_ $ H.ClassName "fa fa-plus" ] []
+          ]
+        ]
 
 eval :: forall eff. Query ~> H.ComponentDSL State Query Message (Eff_ eff)
 eval = case _ of
