@@ -100,46 +100,7 @@ render :: forall eff. State -> H.ParentHTML Query ChildQuery ChildSlot (Eff_ eff
 render state =
   HH.div_
   [
-    HH.nav
-    [ HP.class_ $ H.ClassName "navbar navbar-expand-sm navbar-dark bg-dark" ]
-    [
-      HH.a
-      [ HP.class_ $ H.ClassName "navbar-brand mb-0"
-      , HP.href "/#/"
-      ]
-      [ HH.text "Higaidar" ]
-    , HH.ul
-      [ HP.class_ $ H.ClassName "navbar-nav mr-auto" ]
-      [
-        HH.li
-        [ HP.class_ $ H.ClassName "nav-item" ]
-        [
-          HH.a
-          [ HP.class_ $ H.ClassName "nav-link"
-          , HP.href $ R.path $ R.UsersIndex
-          ]
-          [ HH.text "Users" ]
-        ]
-      , HH.li
-        [ HP.class_ $ H.ClassName "nav-item" ]
-        [
-          HH.a
-          [ HP.class_ $ H.ClassName "nav-link"
-          , HP.href $ R.path $ R.PestsIndex
-          ]
-          [ HH.text "Pests" ]
-        ]
-      ]
-    , renderUserName
-    , HH.a
-      [ HP.class_ $ H.ClassName $ "btn btn-sm "
-        <> if isAuthenticated then "btn-secondary" else "btn-outline-secondary"
-      , HP.href $ R.path R.Login
-      ]
-      [
-        HH.i [ HP.class_ $ H.ClassName "fa fa-user fa-fw" ] []
-      ]
-    ]
+    renderNavbar
   , HH.slot' cpNotice NoticeUI.Slot NoticeUI.ui unit $ HE.input HandleNotice
   , HH.main
     [ HP.class_ $ H.ClassName "container mt-2" ]
@@ -154,6 +115,48 @@ render state =
     locale = state.locale
     isAuthenticated = Api.isAuthenticated client
 
+    renderNavbar =
+      HH.nav
+      [ HP.class_ $ H.ClassName "navbar navbar-expand navbar-dark bg-dark" ]
+      [
+        HH.a
+        [ HP.class_ $ H.ClassName "navbar-brand mb-0"
+        , HP.href "/#/"
+        ]
+        [ HH.text "Higaidar" ]
+      , HH.ul
+        [ HP.class_ $ H.ClassName "navbar-nav mr-auto" ]
+        [
+          HH.li
+          [ HP.class_ $ H.ClassName "nav-item" ]
+          [
+            HH.a
+            [ HP.class_ $ H.ClassName "nav-link"
+            , HP.href $ R.path $ R.UsersIndex
+            ]
+            [ HH.text "Users" ]
+          ]
+        , HH.li
+          [ HP.class_ $ H.ClassName "nav-item" ]
+          [
+            HH.a
+            [ HP.class_ $ H.ClassName "nav-link"
+            , HP.href $ R.path $ R.PestsIndex
+            ]
+            [ HH.text "Pests" ]
+          ]
+        ]
+      , renderUserName
+      , HH.a
+        [ HP.class_ $ H.ClassName $ "btn btn-sm "
+          <> if isAuthenticated then "btn-secondary" else "btn-outline-secondary"
+        , HP.href $ R.path R.Login
+        ]
+        [
+          HH.i [ HP.class_ $ H.ClassName "fa fa-user fa-fw" ] []
+        ]
+      ]
+
     renderUserName = case client of
       Api.Client { user: Just (User { name }) } ->
         HH.span
@@ -165,7 +168,34 @@ render state =
     renderPage = case _ of
       R.Home ->
         withAuthentication
-        $ HH.p_ [ HH.text $ "Home" ]
+        $ HH.ul
+        [ HP.class_ $ H.ClassName "nav flex-column" ]
+        [
+          HH.li
+          [ HP.class_ $ H.ClassName "nav-item" ]
+          [
+            HH.a
+            [ HP.class_ $ H.ClassName "nav-link"
+            , HP.href $ R.path $ R.UsersIndex
+            ]
+            [
+              HH.i [ HP.class_ $ H.ClassName "fa fa-fw fa-users mr-2" ] []
+            , HH.text "Users"
+            ]
+          ]
+        , HH.li
+          [ HP.class_ $ H.ClassName "nav-item" ]
+          [
+            HH.a
+            [ HP.class_ $ H.ClassName "nav-link"
+            , HP.href $ R.path $ R.PestsIndex
+            ]
+            [
+              HH.i [ HP.class_ $ H.ClassName "fa fa-fw fa-bug mr-2" ] []
+            , HH.text "Pests"
+            ]
+          ]
+        ]
 
       R.Login ->
         HH.slot' cpLogin LoginUI.Slot LoginUI.ui { endpoint, isAuthenticated } $ HE.input HandleLogin
