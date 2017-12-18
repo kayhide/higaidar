@@ -7,8 +7,7 @@ import Control.Monad.Except (mapExcept)
 import Data.DateTime (DateTime)
 import Data.Either (Either(..), either)
 import Data.Foreign (F, Foreign, ForeignError(TypeMismatch), readNullOrUndefined, readString, tagOf, toForeign)
-import Data.Foreign.Class (class Decode, class Encode, decode)
-import Data.Foreign.Generic (defaultOptions, genericEncode)
+import Data.Foreign.Class (class Decode, class Encode, decode, encode)
 import Data.Foreign.Index ((!))
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
@@ -19,6 +18,7 @@ import Data.List.NonEmpty as NEL
 import Data.Maybe (Maybe, maybe)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (traverse)
+import Model.Null (null)
 import Model.Photo (PhotoId)
 import Network.HTTP.Affjax (URL)
 
@@ -29,6 +29,7 @@ type PhotoRec
     , user_id :: PhotoId
     , original_url :: URL
     , thumbnail_url :: Maybe URL
+    , pest :: Maybe String
     , created_at :: DateTime
     , updated_at :: DateTime
     }
@@ -49,6 +50,9 @@ _original_url = _Photo <<< prop (SProxy :: SProxy "original_url")
 _thumbnail_url :: Lens' Photo (Maybe String)
 _thumbnail_url = _Photo <<< prop (SProxy :: SProxy "thumbnail_url")
 
+_pest :: Lens' Photo (Maybe String)
+_pest = _Photo <<< prop (SProxy :: SProxy "pest")
+
 _created_at :: Lens' Photo DateTime
 _created_at = _Photo <<< prop (SProxy :: SProxy "created_at")
 
@@ -66,9 +70,10 @@ instance decodePhoto :: Decode Photo where
     user_id <- decode =<< v ! "user_id"
     original_url <- decode =<< v ! "original_url"
     thumbnail_url <- traverse decode =<< readNullOrUndefined =<< v ! "thumbnail_url"
+    pest <- traverse decode =<< readNullOrUndefined =<< v ! "pest"
     created_at <- readDateTime =<< v ! "created_at"
     updated_at <- readDateTime =<< v ! "updated_at"
-    pure $ Photo { id, user_id, original_url, thumbnail_url, created_at, updated_at }
+    pure $ Photo { id, user_id, original_url, thumbnail_url, pest, created_at, updated_at }
 
 
 readDateTime :: Foreign -> F DateTime
@@ -78,15 +83,16 @@ readDateTime value = mapExcept (either (const error) fromString) $ readString va
     error = Left $ NEL.singleton $ TypeMismatch "DateTime" (tagOf value)
 
 instance encodePhoto :: Encode Photo where
-  encode = toForeign <<< toEntity
+  encode = encode <<< toEntity
 
 toEntity :: Photo -> PhotoEntity
-toEntity (Photo { original_url, thumbnail_url }) = PhotoEntity { original_url, thumbnail_url }
+toEntity (Photo { original_url, thumbnail_url, pest }) = PhotoEntity { original_url, thumbnail_url, pest }
 
 
 type PhotoEntityRec
-  = { original_url :: String
-    , thumbnail_url :: Maybe String
+  = { original_url :: URL
+    , thumbnail_url :: Maybe URL
+    , pest :: Maybe String
     }
 newtype PhotoEntity = PhotoEntity PhotoEntityRec
 
@@ -95,4 +101,8 @@ instance showPhotoEntity :: Show PhotoEntity where
   show = genericShow
 
 instance encodePhotoEntity :: Encode PhotoEntity where
-  encode (PhotoEntity { original_url, thumbnail_url }) = toForeign { original_url, thumbnail_url }
+  encode (PhotoEntity { original_url, thumbnail_url, pest }) =
+    toForeign { original_url
+              , thumbnail_url: maybe null encode thumbnail_url
+              , pest: maybe null encode pest
+              }

@@ -4,23 +4,24 @@ import Prelude
 
 import Api as Api
 import Api.My.Photos as Photos
+import Api.Pests as Pests
 import Component.HTML.LoadingIndicator as LoadingIndicator
 import Component.UploadUI as UploadUI
 import Component.Util as Util
 import Control.Monad.Aff (Aff, Milliseconds(..), attempt, delay)
 import Data.Array as Array
-import Data.DateTime as DateTime
-import Data.DateTime.Locale (Locale(..))
-import Data.Either (Either(Left, Right), either)
-import Data.Formatter.DateTime (formatDateTime)
-import Data.Lens (view)
-import Data.Maybe (Maybe(Nothing, Just), isJust, maybe)
+import Data.DateTime.Locale (Locale)
+import Data.Either (Either(Left, Right))
+import Data.Lens (view, (.~))
+import Data.Maybe (Maybe(Nothing, Just), fromMaybe, isJust, maybe)
+import Data.String as String
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Query.HalogenM as HM
-import Model.Photo (Photo(..), PhotoId, _original_url, _thumbnail_url)
+import Model.Pest (Pest(..))
+import Model.Photo (Photo(..), PhotoId, _original_url, _pest, _thumbnail_url)
 import Model.Photo as Photo
 import Network.HTTP.Affjax (AJAX, URL)
 
@@ -33,6 +34,7 @@ derive instance ordSlot :: Ord Slot
 data Query a
   = Initialize a
   | Reload a
+  | SetPest Photo String a
   | Destroy PhotoId a
   | ToggleDeleting a
   | HandleUpload UploadUI.Message a
@@ -42,6 +44,7 @@ type State =
   , loadingItems :: Array URL
   , client :: Api.Client
   , locale :: Locale
+  , pests :: Array Pest
   , deleting :: Boolean
   , busy :: Boolean
   }
@@ -75,6 +78,7 @@ ui =
       , loadingItems: []
       , client
       , locale
+      , pests: []
       , deleting: false
       , busy: false
       }
@@ -138,7 +142,7 @@ render state =
         ]
       ]
 
-    renderItem (Photo { id, original_url, thumbnail_url, created_at }) =
+    renderItem photo@(Photo { id, original_url, thumbnail_url, pest, created_at }) =
       HH.div
       [ HP.class_ $ H.ClassName "col-md-2 col-sm-4 col-6 pb-2" ]
       [ HH.div
@@ -150,13 +154,7 @@ render state =
             maybe (HH.div_ []) renderThumbnail thumbnail_url
           ]
         , if deleting then renderDeleteButton id else HH.div_ []
-        , HH.div
-          [ HP.class_ $ H.ClassName "card-body" ]
-          [
-            HH.p
-            [ HP.class_ $ H.ClassName "card-text text-muted small" ]
-            [ renderDateTime created_at state.locale ]
-          ]
+        , renderPest photo
         ]
       ]
 
@@ -182,23 +180,26 @@ render state =
         ]
       ]
 
-    renderPest =
+    renderPest photo@(Photo { pest }) =
       HH.select
-      [ HP.class_ $ H.ClassName "form-control" ]
-      [
-        HH.option
-        [ HP.value $ show 1 ]
-        [ HH.text "Hamogriga" ]
+      [ HP.class_ $ H.ClassName "form-control"
+      , HE.onValueChange $ HE.input $ SetPest photo
       ]
+      $ [
+        HH.option_ []
+        ] <> (renderPestOption (fromMaybe "" pest) <$> state.pests)
 
-    renderDateTime dt (Locale _ dur) =
-      HH.text $ either id id $ maybe (Left "") (formatDateTime "YYYY/MM/DD HH:mm:ss") dt_
-      where
-        dt_ = (DateTime.adjust (negate dur)) dt
+    renderPestOption selected (Pest { label }) =
+      HH.option
+      [ HP.value $ label
+      , HP.selected $ selected == label
+      ]
+      [ HH.text label ]
 
 eval :: forall eff. Query ~> H.ParentDSL State Query ChildQuery ChildSlot Message (Eff_ eff)
 eval = case _ of
   Initialize next -> do
+    void $ HM.fork loadPests
     void $ HM.fork runPoller
     eval $ Reload next
 
@@ -215,14 +216,28 @@ eval = case _ of
 
     pure next
 
-  Destroy userId next -> do
+  SetPest photo label next -> do
     Util.whenNotBusy_ do
       cli <- H.gets _.client
-      res <- H.liftAff $ attempt $ Photos.destroy cli userId
+      let pest = if String.null label then Nothing else Just label
+      res <- H.liftAff $ attempt $ Photos.update cli $ photo # _pest .~ pest
 
       case res of
         Right _ -> do
-          items <- Array.filter ((userId /= _) <<< view Photo._id) <$> H.gets _.items
+          pure unit
+        Left _ -> do
+          H.raise $ Failed "Failed to update photo."
+
+    pure next
+
+  Destroy photoId next -> do
+    Util.whenNotBusy_ do
+      cli <- H.gets _.client
+      res <- H.liftAff $ attempt $ Photos.destroy cli photoId
+
+      case res of
+        Right _ -> do
+          items <- Array.filter ((photoId /= _) <<< view Photo._id) <$> H.gets _.items
           H.modify _{ items = items }
         Left _ ->
           H.raise $ Failed "Failed to destroy photo."
@@ -242,6 +257,19 @@ eval = case _ of
   HandleUpload (UploadUI.Failed s) next -> do
     H.raise $ Failed s
     pure next
+
+loadPests :: forall eff. H.ParentDSL State Query ChildQuery ChildSlot Message (Eff_ eff) Unit
+loadPests = do
+  cli <- H.gets _.client
+  res <- H.liftAff $ attempt $ Pests.index cli
+
+  case res of
+    Right pests -> do
+      H.modify _{ pests = pests }
+    Left _ -> do
+      H.raise $ Failed "Failed to load Pests. Retrying..."
+      H.liftAff $ delay (Milliseconds 5000.0)
+      loadPests
 
 runPoller :: forall eff. H.ParentDSL State Query ChildQuery ChildSlot Message (Eff_ eff) Unit
 runPoller = do
