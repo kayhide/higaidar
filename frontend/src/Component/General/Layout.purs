@@ -127,19 +127,11 @@ render state =
 
     renderAdminMenu = case client of
       Api.Client { user: Just (User { is_admin: true }) } ->
-        HH.ul
-        [ HP.class_ $ H.ClassName "navbar-nav ml-auto mr-4" ]
-        [
-          HH.li
-          [ HP.class_ $ H.ClassName "nav-item" ]
-          [
-            HH.a
-            [ HP.class_ $ H.ClassName "nav-link"
-            , HP.href "/admin/#/"
-            ]
-            [ HH.text "Admin" ]
-          ]
+        HH.a
+        [ HP.class_ $ H.ClassName "badge badge-danger ml-auto mr-2"
+        , HP.href "/admin/#/"
         ]
+        [ HH.text "admin" ]
       _ ->
         HH.ul
         [ HP.class_ $ H.ClassName "navbar-nav ml-auto" ]

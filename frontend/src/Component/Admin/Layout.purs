@@ -6,6 +6,7 @@ import Api as Api
 import Component.Admin.Route as R
 import Component.LoginUI as LoginUI
 import Component.NoticeUI as NoticeUI
+import Component.PestListUI as PestListUI
 import Component.UserListUI as UserListUI
 import Component.UserShowUI as UserShowUI
 import Control.Monad.Aff (Aff, launchAff_)
@@ -13,8 +14,8 @@ import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Now (NOW)
 import Control.Monad.Eff.Now as Now
 import Data.DateTime.Locale (Locale(..), LocaleName(..))
-import Data.Either.Nested (Either4)
-import Data.Functor.Coproduct.Nested (Coproduct4)
+import Data.Either.Nested (Either5)
+import Data.Functor.Coproduct.Nested (Coproduct5)
 import Data.Maybe (Maybe(Just, Nothing))
 import Data.Time.Duration (Minutes(..))
 import Dom.Storage (STORAGE)
@@ -40,6 +41,7 @@ data Query a
   | HandleLogin LoginUI.Message a
   | HandleUserList UserListUI.Message a
   | HandleUserShow UserShowUI.Message a
+  | HandlePestList PestListUI.Message a
   | Goto R.Location a
 
 type State =
@@ -54,8 +56,8 @@ type Input = AppConfig
 
 type Message = Void
 
-type ChildQuery = Coproduct4 NoticeUI.Query LoginUI.Query UserListUI.Query UserShowUI.Query
-type ChildSlot = Either4 NoticeUI.Slot LoginUI.Slot UserListUI.Slot UserShowUI.Slot
+type ChildQuery = Coproduct5 NoticeUI.Query LoginUI.Query UserListUI.Query UserShowUI.Query PestListUI.Query
+type ChildSlot = Either5 NoticeUI.Slot LoginUI.Slot UserListUI.Slot UserShowUI.Slot PestListUI.Slot
 
 cpNotice :: CP.ChildPath NoticeUI.Query ChildQuery NoticeUI.Slot ChildSlot
 cpNotice = CP.cp1
@@ -68,6 +70,9 @@ cpUserList = CP.cp3
 
 cpUserShow :: CP.ChildPath UserShowUI.Query ChildQuery UserShowUI.Slot ChildSlot
 cpUserShow = CP.cp4
+
+cpPestList :: CP.ChildPath PestListUI.Query ChildQuery PestListUI.Slot ChildSlot
+cpPestList = CP.cp5
 
 type Eff_ eff = Aff (ajax :: AJAX, now :: NOW, storage :: STORAGE | eff)
 
@@ -96,13 +101,13 @@ render state =
   HH.div_
   [
     HH.nav
-    [ HP.class_ $ H.ClassName "navbar navbar-dark bg-dark" ]
+    [ HP.class_ $ H.ClassName "navbar navbar-expand-sm navbar-dark bg-dark" ]
     [
       HH.a
       [ HP.class_ $ H.ClassName "navbar-brand mb-0"
-      , HP.href $ R.path R.Home
+      , HP.href "/#/"
       ]
-      [ HH.text "Higaidar Admin" ]
+      [ HH.text "Higaidar" ]
     , HH.ul
       [ HP.class_ $ H.ClassName "navbar-nav mr-auto" ]
       [
@@ -115,18 +120,14 @@ render state =
           ]
           [ HH.text "Users" ]
         ]
-      ]
-    , HH.ul
-      [ HP.class_ $ H.ClassName "navbar-nav ml-auto mr-4" ]
-      [
-        HH.li
+      , HH.li
         [ HP.class_ $ H.ClassName "nav-item" ]
         [
           HH.a
           [ HP.class_ $ H.ClassName "nav-link"
-          , HP.href "/#/"
+          , HP.href $ R.path $ R.PestsIndex
           ]
-          [ HH.text "General" ]
+          [ HH.text "Pests" ]
         ]
       ]
     , renderUserName
@@ -178,6 +179,9 @@ render state =
       R.UsersShow userId -> withAuthentication
         $ HH.slot' cpUserShow UserShowUI.Slot UserShowUI.ui { userId, client, locale } $ HE.input HandleUserShow
 
+      R.PestsIndex -> withAuthentication
+        $ HH.slot' cpPestList PestListUI.Slot PestListUI.ui { client, locale } $ HE.input HandlePestList
+
     withAuthentication html =
       if Api.isAuthenticated client
       then html
@@ -211,11 +215,10 @@ eval = case _ of
   HandleUserShow (UserShowUI.Failed s) next -> do
     postAlert s
     pure next
-    -- H.modify _{ token = Nothing, userName = Nothing }
-    -- postAlert "Failed to access database."
-    -- postAlert "Try login again."
-    -- loc <- H.gets _.location
-    -- eval $ Goto loc next
+
+  HandlePestList (PestListUI.Failed s) next -> do
+    postAlert s
+    pure next
 
   Goto loc next -> do
     cli <- H.gets _.apiClient
