@@ -34,7 +34,7 @@ data Query a
   = Initialize a
   | Reload a
   | Destroy PhotoId a
-  | PushLoadingItem URL a
+  | ToggleDeleting a
   | HandleUpload UploadUI.Message a
 
 type State =
@@ -42,6 +42,7 @@ type State =
   , loadingItems :: Array URL
   , client :: Api.Client
   , locale :: Locale
+  , deleting :: Boolean
   , busy :: Boolean
   }
 
@@ -74,6 +75,7 @@ ui =
       , loadingItems: []
       , client
       , locale
+      , deleting: false
       , busy: false
       }
 
@@ -81,7 +83,8 @@ render :: forall eff. State -> H.ParentHTML Query ChildQuery ChildSlot (Eff_ eff
 render state =
   HH.div_
   [
-    HH.h1_
+    renderDeletingButton
+  , HH.h1_
     [ HH.text "Photo List" ]
   , LoadingIndicator.render state.busy
   , HH.div
@@ -93,6 +96,19 @@ render state =
 
   where
     client = state.client
+    deleting = state.deleting
+
+    renderDeletingButton =
+      HH.div
+      [ HP.class_ $ H.ClassName "pull-right mt-2" ]
+      [
+        HH.button
+        [ HP.class_ $ H.ClassName $ "btn rounded-circle " <> if deleting then "btn-danger" else "btn-outline-danger"
+        , HE.onClick $ HE.input_ $ ToggleDeleting
+        ]
+        [ HH.i [ HP.class_ $ H.ClassName "fa fa-trash" ] []
+        ]
+      ]
 
     renderUploadUI =
       HH.div
@@ -126,13 +142,14 @@ render state =
       HH.div
       [ HP.class_ $ H.ClassName "col-md-2 col-sm-4 col-6 pb-2" ]
       [ HH.div
-        [ HP.class_ $ H.ClassName "card" ]
+        [ HP.class_ $ H.ClassName "card position-relative" ]
         [
           HH.a
           [ HP.href original_url, HP.target "_blank" ]
           [
-            renderThumbnail thumbnail_url
+            maybe (HH.div_ []) renderThumbnail thumbnail_url
           ]
+        , if deleting then renderDeleteButton id else HH.div_ []
         , HH.div
           [ HP.class_ $ H.ClassName "card-body" ]
           [
@@ -143,14 +160,36 @@ render state =
         ]
       ]
 
-    renderThumbnail = case _ of
-      Just url ->
-        HH.img
-        [ HP.src url
-        , HP.class_ $ H.ClassName "card-img-top"
+    renderThumbnail url =
+      HH.img
+      [ HP.src url
+      , HP.class_ $ H.ClassName "card-img-top"
+      ]
+
+    renderDeleteButton id =
+      HH.div
+      [ HP.class_ $ H.ClassName "position-absolute w-100" ]
+      [
+        HH.div
+        [ HP.class_ $ H.ClassName "card-body text-center" ]
+        [
+          HH.button
+          [ HP.class_ $ H.ClassName "btn btn-danger rounded-circle"
+          , HE.onClick $ HE.input_ $ Destroy id
+          ]
+          [ HH.i [ HP.class_ $ H.ClassName "fa fa-times" ] []
+          ]
         ]
-      Nothing ->
-        HH.div_ []
+      ]
+
+    renderPest =
+      HH.select
+      [ HP.class_ $ H.ClassName "form-control" ]
+      [
+        HH.option
+        [ HP.value $ show 1 ]
+        [ HH.text "Hamogriga" ]
+      ]
 
     renderDateTime dt (Locale _ dur) =
       HH.text $ either id id $ maybe (Left "") (formatDateTime "YYYY/MM/DD HH:mm:ss") dt_
@@ -177,9 +216,7 @@ eval = case _ of
     pure next
 
   Destroy userId next -> do
-    busy <- H.gets _.busy
-    when (not busy) do
-      H.modify _{ busy = true }
+    Util.whenNotBusy_ do
       cli <- H.gets _.client
       res <- H.liftAff $ attempt $ Photos.destroy cli userId
 
@@ -188,12 +225,13 @@ eval = case _ of
           items <- Array.filter ((userId /= _) <<< view Photo._id) <$> H.gets _.items
           H.modify _{ items = items }
         Left _ ->
-          H.raise $ Failed "Failed to delete user."
+          H.raise $ Failed "Failed to destroy photo."
 
-      H.modify _{ busy = false }
     pure next
 
-  PushLoadingItem url next -> do
+  ToggleDeleting next -> do
+    deleting <- not <$> H.gets _.deleting
+    H.modify _{ deleting = deleting }
     pure next
 
   HandleUpload (UploadUI.Uploaded url) next -> do
