@@ -6,6 +6,8 @@ import Api as Api
 import Api.Users as Users
 import Component.Admin.Route as R
 import Component.HTML.LoadingIndicator as LoadingIndicator
+import Component.PagerUI (_count, _current)
+import Component.PagerUI as PagerUI
 import Component.Util as Util
 import Control.Monad.Aff (Aff, attempt)
 import Control.Monad.Aff.Class (class MonadAff)
@@ -15,16 +17,18 @@ import Data.Array as Array
 import Data.DateTime.Locale (Locale)
 import Data.Either (Either(Left, Right))
 import Data.Int as Int
-import Data.Lens (view)
+import Data.Lens (Lens, assign, view)
+import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(Nothing, Just), maybe)
 import Data.String (Pattern(..))
 import Data.String as String
+import Data.Symbol (SProxy(..))
 import Data.Traversable (traverse_)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
-import Model.User (User(..), UserEntity(..), Users, UserId)
+import Model.User (User(User), UserEntity(UserEntity), UserId)
 import Model.User as User
 import Network.HTTP.Affjax (AJAX)
 
@@ -41,15 +45,23 @@ data Query a
   | SetPopulating String a
   | Populate a
   | Destroy UserId a
+  | HandlePager PagerUI.Message a
 
 type State =
-  { items :: Users
+  { items :: Array User
   , client :: Api.Client
   , locale :: Locale
   , busy :: Boolean
   , populating :: String
   , invalids :: Array String
+  , pager :: PagerUI.Pager
   }
+
+_items :: forall a b r. Lens { items :: a | r } { items :: b | r } a b
+_items = prop (SProxy :: SProxy "items")
+
+_pager :: forall a b r. Lens { pager :: a | r } { pager :: b | r } a b
+_pager = prop (SProxy :: SProxy "pager")
 
 type Input =
   { client :: Api.Client
@@ -59,12 +71,14 @@ type Input =
 data Message
   = Failed String
 
+type ChildQuery = PagerUI.Query
+type ChildSlot = PagerUI.Slot
 
 type Eff_ eff = Aff (ajax :: AJAX | eff)
 
 ui :: forall eff. H.Component HH.HTML Query Input Message (Eff_ eff)
 ui =
-  H.lifecycleComponent
+  H.lifecycleParentComponent
     { initialState: initialState
     , render
     , eval
@@ -75,15 +89,23 @@ ui =
 
 initialState :: Input -> State
 initialState { client, locale } =
-    { items: []
-    , client
-    , locale
-    , busy: false
-    , populating: ""
-    , invalids: []
-    }
+  { items: []
+  , client
+  , locale
+  , busy: false
+  , populating: ""
+  , invalids: []
+  , pager
+  }
+  where
+    pager =
+      { current: 1
+      , per: 50
+      , count: 0
+      }
 
-render :: State -> H.ComponentHTML Query
+
+render :: forall eff. State -> H.ParentHTML Query ChildQuery ChildSlot (Eff_ eff)
 render state =
   HH.div_
   [
@@ -98,6 +120,7 @@ render state =
     , HH.tbody_
       $ renderItem <$> state.items
     ]
+  , HH.slot PagerUI.Slot PagerUI.ui state.pager $ HE.input HandlePager
   , renderForm
   ]
 
@@ -179,7 +202,7 @@ render state =
       , HH.text "Populate"
       ]
 
-eval :: forall eff. Query ~> H.ComponentDSL State Query Message (Eff_ eff)
+eval :: forall eff. Query ~> H.ParentDSL State Query ChildQuery ChildSlot Message (Eff_ eff)
 eval = case _ of
   Initialize next -> do
     eval $ Reload next
@@ -189,19 +212,20 @@ eval = case _ of
     pure next
 
   Reload next -> do
-    busy <- H.gets _.busy
-    when (not busy) do
-      H.modify _{ busy = true }
+    Util.whenNotBusy_ do
       cli <- H.gets _.client
-      users <- H.liftAff $ attempt $ Users.index cli
+      pager@{ current, per } <- H.gets _.pager
+      let offset = (current - 1) * per
+      res <- H.liftAff $ attempt $ Users.page cli offset per
 
-      case users of
-        Right users_ ->
-          H.modify _{ items = users_ }
+      case res of
+        Right { body, range: { count } } -> do
+          assign _items body
+          assign (_pager <<< _count) count
+          void <<< H.query PagerUI.Slot <<< H.action <<< PagerUI.SetPager =<< H.gets _.pager
         Left _ ->
           H.raise $ Failed "Failed to access api."
 
-      H.modify _{ busy = false }
     pure next
 
   SetPopulating s next -> do
@@ -225,9 +249,7 @@ eval = case _ of
     pure next
 
   Destroy userId next -> do
-    busy <- H.gets _.busy
-    when (not busy) do
-      H.modify _{ busy = true }
+    Util.whenNotBusy_ do
       cli <- H.gets _.client
       res <- H.liftAff $ attempt $ Users.destroy cli userId
 
@@ -238,8 +260,11 @@ eval = case _ of
         Left _ ->
           H.raise $ Failed "Failed to delete user."
 
-      H.modify _{ busy = false }
     pure next
+
+  HandlePager (PagerUI.Selected page) next -> do
+    assign (_pager <<< _current) page
+    eval $ Reload next
 
 build :: String -> Either String UserEntity
 build row = maybe (Left row) Right $ do

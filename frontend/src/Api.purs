@@ -3,8 +3,11 @@ module Api where
 import Prelude
 
 import Control.Monad.Aff (Aff, error, throwError)
+import Control.Monad.Eff.Console (logShow)
+import Control.Monad.Eff.Unsafe (unsafePerformEff)
 import Control.Monad.Except (runExcept)
-import Data.Either (Either(..))
+import Data.Array as Array
+import Data.Either (Either(..), either)
 import Data.Foreign.Class (class Decode, class Encode)
 import Data.Foreign.Generic (decodeJSON, defaultOptions, encodeJSON, genericDecode, genericEncode)
 import Data.Generic.Rep (class Generic)
@@ -14,10 +17,14 @@ import Data.Lens (Lens', lens, (^.))
 import Data.Maybe (Maybe(..), maybe)
 import Data.Newtype (class Newtype, unwrap, wrap)
 import Data.String as String
+import Data.Traversable (traverse)
 import Model.User (User)
 import Network.HTTP.Affjax (AJAX, AffjaxRequest, AffjaxResponse, URL)
 import Network.HTTP.Affjax as Affjax
 import Network.HTTP.RequestHeader (RequestHeader(..))
+import Network.HTTP.ResponseHeader (responseHeaderName, responseHeaderValue)
+import Text.Parsing.Simple (parse)
+import Text.Parsing.Simple as P
 
 
 newtype Client
@@ -67,9 +74,28 @@ isAuthenticated = case _ of
   _ -> false
 
 
+type Range =
+  { first :: Int
+  , last :: Int
+  , count :: Int
+  }
+
+type WithRange a =
+  { body :: a
+  , range :: Range
+  }
+
 get :: forall eff a. Decode a => Client -> String -> Aff (ajax :: AJAX | eff) a
 get cli path
   = buildGet cli path >>= Affjax.affjax >>= handle
+
+getWithRange :: forall eff a. Decode a => Client -> String -> Aff (ajax :: AJAX | eff) (WithRange a)
+getWithRange cli path = do
+  res <- buildGet cli path >>= Affjax.affjax
+  body <- handle res
+  range <- pickContentRange res
+  pure { body, range }
+
 
 post :: forall eff a b. Encode a => Decode b => Client -> String -> a -> Aff (ajax :: AJAX | eff) b
 post cli path x
@@ -138,3 +164,21 @@ handleError body =
   case (runExcept $ decodeJSON body) of
     Right (ResponseNg ng) -> throwError $ error ng.message
     Left err -> throwError <<< error $ body <> show err
+
+pickContentRange :: forall eff. AffjaxResponse String -> Aff eff Range
+pickContentRange res = do
+  contentRange <-
+    maybe (throwError $ error "Content-Range not present") (pure <<< responseHeaderValue)
+    $ Array.find (eq "content-range" <<< responseHeaderName) res.headers
+  range <-
+    either (const $ throwError $ error "Content-Range mal-formatted") pure
+    $ parse parser contentRange
+  pure range
+  where
+    parser = do
+      first <- P.int
+      void $ P.char '-'
+      last <- P.int
+      void $ P.char '/'
+      count <- P.int
+      pure { first, last, count }
