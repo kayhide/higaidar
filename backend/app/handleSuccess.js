@@ -16,7 +16,8 @@ const handle = function* (body, opts) {
 module.exports = (callback) => (body, opts = {}) => {
   const res = handle(body, opts).next().value;
   res.headers = {
-    "Access-Control-Allow-Origin": "*"
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Expose-Headers": "Content-Type, Content-Range, Range-Unit"
   };
   if (typeof opts.offset !== 'undefined') {
     const offset = opts.offset;
