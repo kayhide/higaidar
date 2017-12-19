@@ -37,7 +37,7 @@ module.exports.create = (event, context, callback) => {
   co(function *() {
     const params = JSON.parse(event.body);
     const data = yield model.with(m => {
-      return m.User.create(params);
+      return m.User.create(params).then(user => m.User.findById(user.id));
     });
 
     handleSuccess(callback)(data.dataValues);
