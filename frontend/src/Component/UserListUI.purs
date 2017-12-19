@@ -6,14 +6,14 @@ import Api as Api
 import Api.Users as Users
 import Component.Admin.Route as R
 import Component.HTML.LoadingIndicator as LoadingIndicator
+import Component.Util as Util
 import Control.Monad.Aff (Aff, attempt)
 import Control.Monad.Aff.Class (class MonadAff)
-import Control.Monad.Except (ExceptT, throwError)
 import Control.Monad.State (class MonadState)
 import Data.Array ((!!))
 import Data.Array as Array
 import Data.DateTime.Locale (Locale)
-import Data.Either (Either(Left, Right), either)
+import Data.Either (Either(Left, Right))
 import Data.Int as Int
 import Data.Lens (view)
 import Data.Maybe (Maybe(Nothing, Just), maybe)
@@ -154,7 +154,7 @@ render state =
         HH.span_ []
 
     renderForm =
-      HH.form_
+      HH.div_
       [
         HH.div
         [ HP.class_ $ H.ClassName "mb-2" ]
@@ -209,8 +209,7 @@ eval = case _ of
     pure next
 
   Populate next -> do
-    busy <- H.gets _.busy
-    when (not busy) do
+    Util.whenNotBusy_ do
       H.modify _{ invalids = [] }
       text <- H.gets _.populating
       let rows = Array.filter (not String.null) $ String.trim <$> String.split (Pattern "\n") text
@@ -223,7 +222,6 @@ eval = case _ of
       when (not $ Array.null invalids) do
         H.raise $ Failed "Failed to create some users."
 
-      H.modify _{ busy = false }
     pure next
 
   Destroy userId next -> do
@@ -242,9 +240,6 @@ eval = case _ of
 
       H.modify _{ busy = false }
     pure next
-
-onLeft :: forall e m. Monad m => String -> Either e ~> ExceptT String m
-onLeft s = either (throwError <<< const s) pure
 
 build :: String -> Either String UserEntity
 build row = maybe (Left row) Right $ do
@@ -269,7 +264,7 @@ tryCreate cli row = do
         Right user__ -> do
           items <- (_ <> [user__]) <$> H.gets _.items
           H.modify _{ items = items }
-        Left s -> do
+        Left _ -> do
           invalids <- (_ <> [row]) <$> H.gets _.invalids
           H.modify _{ invalids = invalids }
 

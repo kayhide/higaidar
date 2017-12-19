@@ -112,7 +112,7 @@ render state =
                  (\s -> maybe s (flip (set User._code) s) <<< fromString)
 
     renderForm =
-      HH.form
+      HH.div
       [ HP.class_ $ H.ClassName "col-md-12 mb-4" ]
       [
         renderInput "user-code" "Code" _User_code
