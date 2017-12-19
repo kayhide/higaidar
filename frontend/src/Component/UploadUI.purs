@@ -5,6 +5,7 @@ import Prelude
 import Api as Api
 import Api.Photos.SignedUrl as PhotosSigneUrl
 import Component.HTML.LoadingIndicator as LoadingIndicator
+import Component.Util as Util
 import Control.Monad.Aff (Aff, attempt)
 import Control.Monad.Eff.Unsafe (unsafePerformEff)
 import Control.Monad.Except (ExceptT, runExceptT, throwError)
@@ -16,7 +17,7 @@ import DOM.File.FileList as FileList
 import DOM.File.Types (fileToBlob)
 import DOM.HTML.HTMLInputElement as DOM
 import DOM.HTML.Indexed.InputType as InputType
-import Data.Either (Either(..), either, hush)
+import Data.Either (Either(Left, Right), hush)
 import Data.Lens (set)
 import Data.Maybe (Maybe(Nothing, Just), maybe)
 import Data.MediaType (MediaType(..))
@@ -116,12 +117,12 @@ eval = case _ of
     let files = unsafePerformEff $ DOM.files elm
     let file = join $ FileList.item 0 <$> files
 
-    whenNotBusy do
+    Util.whenNotBusy_ do
       res <- runExceptT do
         blob <- maybe (throwError "File not set") (pure <<< fileToBlob) file
         filename <- maybe (throwError "File not set") (pure <<< File.name) file
         signed_url <- getSignedUrl filename
-        void $ onLeft "Failed to upload"
+        void $ Util.onLeft "Failed to upload"
           =<< (H.liftAff $ attempt $ Affjax.put_ signed_url blob)
         pure signed_url
 
@@ -139,17 +140,5 @@ eval = case _ of
 getSignedUrl :: forall eff. String -> ExceptT String (H.ComponentDSL State Query Message (Eff_ eff)) URL
 getSignedUrl filename = do
     cli <- lift $ H.gets _.config.client
-    onLeft "Failed to issue signed url"
+    Util.onLeft "Failed to issue signed url"
       =<< (H.liftAff $ attempt $ PhotosSigneUrl.create cli filename)
-
-onLeft :: forall e m. Monad m => String -> Either e ~> ExceptT String m
-onLeft s = either (throwError <<< const s) pure
-
-whenNotBusy :: forall eff. H.ComponentDSL State Query Message (Eff_ eff) Unit -> H.ComponentDSL State Query Message (Eff_ eff) Unit
-whenNotBusy action = do
-  busy <- H.gets _.busy
-  when (not busy) do
-    H.modify _{ busy = true }
-    action
-    H.modify _{ busy = false }
-  pure unit
