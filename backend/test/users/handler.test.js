@@ -125,7 +125,7 @@ describe('users', () => {
           assert(cur === 1);
 
           const user = yield User.findOne();
-          assert(_.matches(user.dataValues, attrs));
+          assert(_.isMatch(user.dataValues, attrs));
         });
       });
 
@@ -135,7 +135,7 @@ describe('users', () => {
           assert(res.statusCode === 200);
 
           const body = JSON.parse(res.body);
-          assert(_.matches(body, attrs));
+          assert(_.isMatch(body, attrs));
         });
       });
     });
@@ -242,7 +242,7 @@ describe('users', () => {
           assert(res.statusCode === 200);
 
           const body = JSON.parse(res.body);
-          assert(_.matches(body, attrs));
+          assert(_.isMatch(body, attrs));
         });
       });
     });

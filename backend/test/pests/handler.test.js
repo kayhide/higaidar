@@ -110,7 +110,7 @@ describe('pests', () => {
           assert(cur === 1);
 
           const pest = yield Pest.findOne();
-          assert(_.matches(pest.dataValues, attrs));
+          assert(_.isMatch(pest.dataValues, attrs));
         });
       });
 
@@ -120,7 +120,7 @@ describe('pests', () => {
           assert(res.statusCode === 200);
 
           const body = JSON.parse(res.body);
-          assert(_.matches(body, attrs));
+          assert(_.isMatch(body, attrs));
         });
       });
     });

@@ -139,7 +139,7 @@ describe('my/photos', () => {
           assert(cur === 1);
 
           const photo = yield Photo.findOne();
-          assert(_.matches(photo.dataValues, attrs));
+          assert(_.isMatch(photo.dataValues, attrs));
         });
       });
 
@@ -149,7 +149,7 @@ describe('my/photos', () => {
           assert(res.statusCode === 200);
 
           const body = JSON.parse(res.body);
-          assert(_.matches(body, attrs));
+          assert(_.isMatch(body, attrs));
         });
       });
     });
@@ -217,7 +217,7 @@ describe('my/photos', () => {
           assert(res.statusCode === 200);
 
           const body = JSON.parse(res.body);
-          assert(_.matches(body, attrs));
+          assert(_.isMatch(body, attrs));
         });
       });
     });
