@@ -78,8 +78,8 @@ describe('users', () => {
       it('offsets and limits', () => {
         return co(function *() {
           event.queryStringParameters = {
-            offset: 2,
-            limit: 3
+            offset: '2',
+            limit: '3'
           };
           const users = yield factory.createList(User, 7);
           const res = yield handle(event, {})

@@ -72,8 +72,8 @@ describe('pests', () => {
       it('offsets and limits', () => {
         return co(function *() {
           event.queryStringParameters = {
-            offset: 2,
-            limit: 3
+            offset: '2',
+            limit: '3'
           };
           const pests = yield factory.createList(Pest, 7);
           const res = yield handle(event, {})

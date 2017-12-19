@@ -100,8 +100,8 @@ describe('my/photos', () => {
       it('offsets and limits', () => {
         return co(function *() {
           event.queryStringParameters = {
-            offset: 2,
-            limit: 3
+            offset: '2',
+            limit: '3'
           };
           const photos = yield factory.createList(Photo, 7, { user_id: user.id });
           const photos_ = _.reverse(photos);

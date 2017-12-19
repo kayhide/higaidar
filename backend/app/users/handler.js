@@ -17,7 +17,10 @@ module.exports.index = (event, context, callback) => {
   co(function *() {
     const { offset, limit } = Object.assign(
       { offset: 0, limit: 50 },
-      _.pick(event.queryStringParameters, 'offset', 'limit'));
+      _.mapValues(
+        _.pick(event.queryStringParameters, 'offset', 'limit'),
+        parseInt
+      ));
     const { data, total } = yield model.with(m => co(function *() {
       const data = yield m.User.findAll({ order: [['code', 'ASC']], offset, limit });
       const total = yield m.User.count();
