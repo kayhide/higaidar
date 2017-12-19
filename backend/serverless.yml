@@ -17,6 +17,7 @@ provider:
         - s3:GetObject
         - s3:PutObject
         - s3:PutObjectACL
+        - s3:DeleteObject
       Resource:
         - "arn:aws:s3:::${self:provider.environment.RESOURCE_PREFIX}photos/*"
         - "arn:aws:s3:::${self:provider.environment.RESOURCE_PREFIX}photos-thumbnail/*"

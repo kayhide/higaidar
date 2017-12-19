@@ -10,7 +10,9 @@ const proxyquire = require('proxyquire');
 const helper = require('test/test-helper');
 const fixture = require('test/fixture');
 const factory = require('test/factory');
+const Localstack = require('lib/localstack');
 
+const s3 = new Localstack.S3();
 
 describe('my/photos', () => {
   let User;
@@ -259,7 +261,29 @@ describe('my/photos', () => {
       it('returns 204', () => {
         return co(function *() {
           const res = yield handle(event, {});
+          console.log(res);
           assert(res.statusCode === 204);
+        });
+      });
+
+      it('deletes uploaded files', () => {
+        const srcBucket = 'higaidar-test-photos';
+        const dstBucket = `${srcBucket}-thumbnail`;
+        const file = 'cute_cat.jpg';
+        const key = `${user.id}/japan/tokyo/nyappori/${file}`;
+        return co(function *() {
+          yield helper.setS3File(s3, srcBucket, key, file);
+          yield helper.setS3File(s3, dstBucket, key, file);
+          const original = yield helper.exists(s3, srcBucket, key);
+          assert(original);
+          const thumbnail = yield helper.exists(s3, dstBucket, key);
+          assert(thumbnail);
+          yield photo.update({ key });
+          yield handle(event, {});
+          const original_ = yield helper.exists(s3, srcBucket, key);
+          assert(!original_);
+          const thumbnail_ = yield helper.exists(s3, dstBucket, key);
+          assert(!thumbnail_);
         });
       });
     });

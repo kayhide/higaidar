@@ -2,12 +2,21 @@
 
 const _ = require('lodash');
 const co = require('co');
+const promisify = require('util.promisify');
 const util = require('util');
+
+const AWS = require('aws-sdk');
+const s3 = new AWS.S3();
+
+const deleteObject = promisify(s3.deleteObject.bind(s3));
 
 const verify = require('app/verify');
 const handleSuccess = require('app/handleSuccess');
 const handleError = require('app/handleError');
 const model = require('app/model');
+
+const srcBucket = `${process.env.RESOURCE_PREFIX}photos`;
+const dstBucket = `${process.env.RESOURCE_PREFIX}photos-thumbnail`;
 
 
 module.exports.index = (event, context, callback) => {
@@ -89,8 +98,10 @@ module.exports.destroy = (event, context, callback) => {
     const id = event.pathParameters.id;
     const data = yield model.with(m => co(function *() {
       const user = yield getUser(m, event).then(verify.presence);
-      return m.Photo.findOne({ where: { id: id, user_id: user.id } }).then(verify.presence)
-        .then(u => u.destroy());
+      const photo = yield m.Photo.findOne({ where: { id: id, user_id: user.id } }).then(verify.presence);
+      yield photo.destroy();
+      yield deleteObject({ Bucket: srcBucket, Key: photo.key });
+      yield deleteObject({ Bucket: dstBucket, Key: photo.key });
     }));
 
     handleSuccess(callback)(null);
