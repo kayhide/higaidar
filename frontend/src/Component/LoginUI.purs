@@ -9,8 +9,7 @@ import Component.Util as Util
 import Control.Monad.Aff (Aff, attempt)
 import Control.Monad.Except (runExceptT)
 import Data.Either (Either(Left, Right))
-import Data.Int (fromString)
-import Data.Maybe (Maybe(Nothing, Just), fromMaybe)
+import Data.Maybe (Maybe(Nothing, Just))
 import Dom.Storage (STORAGE)
 import Dom.Storage as Storage
 import Halogen as H
@@ -62,7 +61,7 @@ ui =
   where
     initialState client =
       { client
-      , form: Api.AuthenticateForm { code: 0, tel: "" }
+      , form: Api.AuthenticateForm { code: "", tel: "" }
       , name: Nothing
       , busy: false
       }
@@ -86,7 +85,7 @@ render state@({ form: Api.AuthenticateForm { code, tel } }) =
       [
         HH.input
         [ HP.class_ $ H.ClassName "form-control mr-2"
-        , HP.value $ show code
+        , HP.value code
         , HE.onValueInput $ HE.input SetCode
         ]
       , HH.input
@@ -162,27 +161,23 @@ eval = case _ of
     pure next
 
   SetCode code next -> do
-    case fromString code of
-      Just code_ -> do
-        (Api.AuthenticateForm form) <- H.gets _.form
-        H.modify $ _{ form = Api.AuthenticateForm $ form { code = code_ } }
-      Nothing ->
-        pure unit
+    Api.AuthenticateForm form <- H.gets _.form
+    H.modify $ _{ form = Api.AuthenticateForm $ form { code = code } }
     pure next
 
   SetTel tel next -> do
-    (Api.AuthenticateForm form) <- H.gets _.form
+    Api.AuthenticateForm form <- H.gets _.form
     H.modify $ _{ form = Api.AuthenticateForm $ form { tel = tel } }
     pure next
 
 
 loadForm :: forall eff. Aff (storage :: STORAGE | eff) Api.AuthenticateForm
 loadForm = do
-  code <- (fromMaybe 0 <<< fromString) <$> Storage.get "user.code"
+  code <- Storage.get "user.code"
   tel <- Storage.get "user.tel"
   pure $ Api.AuthenticateForm { code, tel }
 
 saveForm :: forall eff. Api.AuthenticateForm -> Aff (storage :: STORAGE | eff) Unit
 saveForm (Api.AuthenticateForm { code, tel }) = do
-  Storage.set "user.code" $ show code
+  Storage.set "user.code" code
   Storage.set "user.tel" tel

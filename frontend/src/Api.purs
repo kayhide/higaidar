@@ -3,8 +3,6 @@ module Api where
 import Prelude
 
 import Control.Monad.Aff (Aff, error, throwError)
-import Control.Monad.Eff.Console (logShow)
-import Control.Monad.Eff.Unsafe (unsafePerformEff)
 import Control.Monad.Except (runExcept)
 import Data.Array as Array
 import Data.Either (Either(..), either)
@@ -17,7 +15,6 @@ import Data.Lens (Lens', lens, (^.))
 import Data.Maybe (Maybe(..), maybe)
 import Data.Newtype (class Newtype, unwrap, wrap)
 import Data.String as String
-import Data.Traversable (traverse)
 import Model.User (User)
 import Network.HTTP.Affjax (AJAX, AffjaxRequest, AffjaxResponse, URL)
 import Network.HTTP.Affjax as Affjax
@@ -52,7 +49,7 @@ _token :: Lens' Client (Maybe AuthenticationToken)
 _token = lens (_.token <<< unwrap) (\s a -> wrap $ _{ token = a } $ unwrap s)
 
 
-type UserCode = Int
+type UserCode = String
 type UserTel = String
 type AuthenticationToken = String
 

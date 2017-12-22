@@ -22,7 +22,7 @@ type UserId = Int
 
 type UserRec
   = { id :: UserId
-    , code :: Int
+    , code :: String
     , tel :: String
     , name :: String
     , is_admin :: Boolean
@@ -37,7 +37,7 @@ _User = lens (\(User r) -> r) (\_ r -> User r)
 _id :: Lens' User UserId
 _id = _User <<< prop (SProxy :: SProxy "id")
 
-_code :: Lens' User Int
+_code :: Lens' User String
 _code = _User <<< prop (SProxy :: SProxy "code")
 
 _tel :: Lens' User String
@@ -88,7 +88,7 @@ toEntity (User { code, tel, name, is_admin }) = UserEntity { code, tel, name, is
 
 
 type UserEntityRec
-  = { code :: Int
+  = { code :: String
     , tel :: String
     , name :: String
     , is_admin :: Boolean

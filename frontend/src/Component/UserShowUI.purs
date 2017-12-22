@@ -4,7 +4,6 @@ import Prelude
 
 import Api as Api
 import Api.Users as Users
-import Component.Admin.Route as R
 import Component.HTML.Checkbox as Checkbox
 import Component.HTML.LoadingIndicator as LoadingIndicator
 import Component.HTML.TextField as TextField
@@ -12,8 +11,7 @@ import Control.Monad.Aff (Aff, attempt)
 import Control.Monad.Except (ExceptT, lift, runExceptT, throwError)
 import Data.DateTime.Locale (Locale)
 import Data.Either (Either, either)
-import Data.Int (fromString)
-import Data.Lens (Lens', _Just, assign, lens, set, view)
+import Data.Lens (Lens', _Just, assign, view)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(Just, Nothing), maybe)
 import Data.Symbol (SProxy(..))
@@ -101,21 +99,11 @@ render state =
   ]
 
   where
-    _User_code :: Lens' User String
-    _User_code = lens
-                 (show <<< view User._code)
-                 (\s -> maybe s (flip (set User._code) s) <<< fromString)
-
-    _User_is_admin :: Lens' User String
-    _User_is_admin = lens
-                 (show <<< view User._is_admin)
-                 (\s -> maybe s (flip (set User._code) s) <<< fromString)
-
     renderForm =
       HH.div
       [ HP.class_ $ H.ClassName "col-md-12 mb-4" ]
       [
-        renderInput "user-code" "Code" _User_code
+        renderInput "user-code" "Code" User._code
       , renderInput "user-name" "Name" User._name
       , renderInput "user-tel" "Tel" User._tel
       , renderCheckbox "user-is_admin" "Admin" User._is_admin
@@ -146,21 +134,19 @@ render state =
         [
           HH.div
           [ HP.class_ $ H.ClassName "card-body" ]
-          [ HH.p
+          [
+            HH.div
             [ HP.class_ $ H.ClassName "card-text small" ]
-            [
-              HH.i
-              [ HP.class_ $ H.ClassName "fa fa-user mr-2" ] []
-            , HH.a
-              [ HP.href $ R.path $ R.UsersShow id ]
-              [ HH.text name ]
-            ]
+            [ HH.text name ]
           , HH.div
             [ HP.class_ $ H.ClassName "card-text small" ]
-            [ HH.text $ show code ]
+            [ HH.text name ]
           , HH.div
             [ HP.class_ $ H.ClassName "card-text small" ]
-            [ HH.text $ tel ]
+            [ HH.text code ]
+          , HH.div
+            [ HP.class_ $ H.ClassName "card-text small" ]
+            [ HH.text tel ]
           , HH.div
             [ HP.class_ $ H.ClassName "card-text small" ]
             [ HH.text $ show is_admin ]

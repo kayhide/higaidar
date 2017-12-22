@@ -16,7 +16,6 @@ import Data.Array ((!!))
 import Data.Array as Array
 import Data.DateTime.Locale (Locale)
 import Data.Either (Either(Left, Right))
-import Data.Int as Int
 import Data.Lens (Lens, assign, view)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(Nothing, Just), maybe)
@@ -152,7 +151,7 @@ render state =
           [ HH.text name ]
         ]
       , HH.td_
-        [ HH.text $ show code ]
+        [ HH.text code ]
       , HH.td_
         [ HH.text tel ]
       , HH.dt_
@@ -269,7 +268,7 @@ eval = case _ of
 build :: String -> Either String UserEntity
 build row = maybe (Left row) Right $ do
   name <- cols !! 0
-  code <- Int.fromString =<< cols !! 1
+  code <- cols !! 1
   tel <- cols !! 2
   pure $ UserEntity { name, code, tel, is_admin: false }
   where
