@@ -17,7 +17,7 @@ import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
-import Network.HTTP.Affjax (AJAX, URL)
+import Network.HTTP.Affjax (AJAX)
 
 
 data Slot = Slot
@@ -25,15 +25,9 @@ derive instance eqSlot :: Eq Slot
 derive instance ordSlot :: Ord Slot
 
 
-type Config =
-  { endpoint :: URL
-  , isAuthenticated :: Boolean
-  }
-
 type State =
-  { config :: Config
+  { client :: Api.Client
   , form :: Api.AuthenticateForm
-  , isAuthenticated :: Boolean
   , name :: Maybe String
   , busy :: Boolean
   }
@@ -41,13 +35,15 @@ type State =
 data Query a
   = Initialize a
   | Authenticate a
+  | Unauthenticate a
   | SetCode String a
   | SetTel String a
 
-type Input = Config
+type Input = Api.Client
 
 data Message
   = Authenticated Api.Client
+  | Unauthenticated Api.Client
   | Failed Api.Client Api.AuthenticateForm String
 
 
@@ -56,18 +52,20 @@ type Eff_ eff = Aff (ajax :: AJAX, storage :: STORAGE | eff)
 ui :: forall eff. H.Component HH.HTML Query Input Message (Eff_ eff)
 ui =
   H.lifecycleComponent
-    { initialState: { config: _
-                    , form: Api.AuthenticateForm { code: 0, tel: "" }
-                    , isAuthenticated: false
-                    , name: Nothing
-                    , busy: false
-                    }
+    { initialState
     , render
     , eval
     , receiver: const Nothing
     , initializer: Just $ H.action Initialize
     , finalizer: Nothing
     }
+  where
+    initialState client =
+      { client
+      , form: Api.AuthenticateForm { code: 0, tel: "" }
+      , name: Nothing
+      , busy: false
+      }
 
 render :: State -> H.ComponentHTML Query
 render state@({ form: Api.AuthenticateForm { code, tel } }) =
@@ -80,6 +78,8 @@ render state@({ form: Api.AuthenticateForm { code, tel } }) =
   ]
 
   where
+    isAuthenticated = Api.isAuthenticated state.client
+
     renderForm =
       HH.div
       [ HP.class_ $ H.ClassName "form" ]
@@ -94,18 +94,28 @@ render state@({ form: Api.AuthenticateForm { code, tel } }) =
         , HP.value tel
         , HE.onValueInput $ HE.input SetTel
         ]
-      , HH.button
-        [ HP.class_ $ H.ClassName buttonClass
+      , renderButton
+      ]
+
+    renderButton = case isAuthenticated of
+      true ->
+        HH.button
+        [ HP.class_ $ H.ClassName $ "btn btn-secondary"
+        , HE.onClick $ HE.input_ Unauthenticate
+        ]
+        [
+          HH.i [ HP.class_ $ H.ClassName "fa fa-sign-out fa-fw mr-1" ] []
+        , HH.text "Logout"
+        ]
+      false ->
+        HH.button
+        [ HP.class_ $ H.ClassName $ "btn btn-outline-secondary"
         , HE.onClick $ HE.input_ Authenticate
         ]
         [
-          HH.i [ HP.class_ $ H.ClassName "fa fa-sign-in fa-fw mr-1" ] []
+          HH.i [ HP.class_ $ H.ClassName "fa fa-sign-out fa-fw mr-1" ] []
         , HH.text "Login"
         ]
-      ]
-
-    buttonClass =
-      "btn " <> if state.isAuthenticated then "btn-secondary" else "btn-outline-secondary"
 
 eval :: forall eff. Query ~> H.ComponentDSL State Query Message (Eff_ eff)
 eval = case _ of
@@ -113,9 +123,9 @@ eval = case _ of
     form <- H.liftAff $ attempt loadForm
     case form of
       Right form_ -> do
-        isAuthenticated <-  H.gets _.config.isAuthenticated
         H.modify _{ form = form_ }
-        H.gets _.config.isAuthenticated >>= case _ of
+        isAuthenticated <- Api.isAuthenticated <$> H.gets _.client
+        case isAuthenticated of
           true -> pure next
           false -> eval $ Authenticate next
       Left s ->
@@ -123,7 +133,7 @@ eval = case _ of
 
   Authenticate next -> do
     Util.whenNotBusy_ do
-      endpoint <- H.gets _.config.endpoint
+      Api.Client { endpoint } <- H.gets _.client
       form <- H.gets _.form
       let cli = Api.makeClient endpoint
 
@@ -133,13 +143,21 @@ eval = case _ of
 
       case res of
         Right cli_ -> do
-          H.modify _{ isAuthenticated = true }
+          H.modify _{ client = cli_ }
           H.liftAff $ saveForm form
           H.raise $ Authenticated cli_
 
         Left s -> do
-          H.modify _{ isAuthenticated = false }
+          H.modify _{ client = cli }
           H.raise $ Failed cli form s
+
+    pure next
+
+  Unauthenticate next -> do
+    Api.Client { endpoint } <- H.gets _.client
+    let cli = Api.makeClient endpoint
+    H.modify _{ client = cli }
+    H.raise $ Unauthenticated $ cli
 
     pure next
 

@@ -13,10 +13,12 @@ import Control.Monad.Aff (Aff, launchAff_)
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Now (NOW)
 import Control.Monad.Eff.Now as Now
+import DOM (DOM)
 import Data.DateTime.Locale (Locale(..), LocaleName(..))
 import Data.Either.Nested (Either5)
 import Data.Functor.Coproduct.Nested (Coproduct5)
 import Data.Maybe (Maybe(Just, Nothing))
+import Data.String as String
 import Data.Time.Duration (Minutes(..))
 import Dom.Storage (STORAGE)
 import Halogen as H
@@ -28,6 +30,7 @@ import Halogen.HTML.Properties as HP
 import Model.User (User(..))
 import Network.HTTP.Affjax (AJAX)
 import Routing (matches)
+import Routing.Hash as Routing
 
 
 type AppConfig =
@@ -49,7 +52,6 @@ type State =
   , apiClient :: Api.Client
   , locale :: Locale
   , location :: R.Location
-  , locationAfterLogin :: R.Location
   }
 
 type Input = AppConfig
@@ -74,7 +76,7 @@ cpUserShow = CP.cp4
 cpPestList :: CP.ChildPath PestListUI.Query ChildQuery PestListUI.Slot ChildSlot
 cpPestList = CP.cp5
 
-type Eff_ eff = Aff (ajax :: AJAX, now :: NOW, storage :: STORAGE | eff)
+type Eff_ eff = Aff (ajax :: AJAX, dom :: DOM, now :: NOW, storage :: STORAGE | eff)
 
 ui :: forall eff. H.Component HH.HTML Query Input Message (Eff_ eff)
 ui =
@@ -92,7 +94,6 @@ ui =
       , apiClient: Api.makeClient apiEndpoint
       , locale: Locale (Just (LocaleName "GMT")) (Minutes 0.0)
       , location: R.Home
-      , locationAfterLogin: R.Home
       }
 
 
@@ -110,7 +111,6 @@ render state =
   ]
 
   where
-    endpoint = state.appConfig.apiEndpoint
     client = state.apiClient
     locale = state.locale
     isAuthenticated = Api.isAuthenticated client
@@ -198,7 +198,7 @@ render state =
         ]
 
       R.Login ->
-        HH.slot' cpLogin LoginUI.Slot LoginUI.ui { endpoint, isAuthenticated } $ HE.input HandleLogin
+        HH.slot' cpLogin LoginUI.Slot LoginUI.ui client $ HE.input HandleLogin
 
       R.UsersIndex ->
         withAuthentication
@@ -215,22 +215,32 @@ render state =
     withAuthentication html =
       if isAuthenticated
       then html
-      else HH.text $ "Not authenticated"
+      else
+        HH.slot' cpLogin LoginUI.Slot LoginUI.ui client $ HE.input HandleLogin
 
 eval :: forall eff. Query ~> H.ParentDSL State Query ChildQuery ChildSlot Message (Eff_ eff)
 eval = case _ of
   Initialize next -> do
     locale <- H.liftEff Now.locale
     H.modify _{ locale = locale }
+
+    hash <- H.liftEff $ Routing.getHash
+    when (String.null hash) $
+      H.liftEff $ Routing.setHash "/"
+
     pure next
 
   HandleNotice (NoticeUI.Closed i) next -> do
     pure next
 
   HandleLogin (LoginUI.Authenticated client) next -> do
-    loc <- H.gets _.locationAfterLogin
-    H.modify _{ apiClient = client, location = loc }
+    H.modify _{ apiClient = client }
     postInfo "Authenticated."
+    pure next
+
+  HandleLogin (LoginUI.Unauthenticated client) next -> do
+    H.modify _{ apiClient = client }
+    postInfo "Unauthenticated."
     pure next
 
   HandleLogin (LoginUI.Failed client _ s) next -> do
@@ -251,12 +261,7 @@ eval = case _ of
     pure next
 
   Goto loc next -> do
-    cli <- H.gets _.apiClient
-    case Api.isAuthenticated cli of
-      true ->
-        H.modify _{ location = loc, locationAfterLogin = loc }
-      false ->
-        H.modify _{ location = R.Login, locationAfterLogin = loc }
+    H.modify _{ location = loc }
     pure next
 
   where
