@@ -212,9 +212,13 @@ resources:
           CorsRules:
             - AllowedMethods:
                 - GET
+                - PUT
                 - HEAD
               AllowedOrigins:
                 - "*"
+              AllowedHeaders:
+                - "Content-Type"
+                - "Origin"
 
     S3BucketPhotosThumbnail:
       Type: "AWS::S3::Bucket"
