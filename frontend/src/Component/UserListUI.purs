@@ -11,14 +11,15 @@ import Component.PagerUI as PagerUI
 import Component.Util as Util
 import Control.Monad.Aff (Aff, attempt)
 import Control.Monad.Aff.Class (class MonadAff)
+import Control.Monad.Except (runExceptT)
 import Control.Monad.State (class MonadState)
 import Data.Array ((!!))
 import Data.Array as Array
 import Data.DateTime.Locale (Locale)
 import Data.Either (Either(Left, Right))
-import Data.Lens (Lens, assign, view)
+import Data.Lens (Lens, assign, modifying, view)
 import Data.Lens.Record (prop)
-import Data.Maybe (Maybe(Nothing, Just), maybe)
+import Data.Maybe (Maybe(Nothing, Just))
 import Data.String (Pattern(..))
 import Data.String as String
 import Data.Symbol (SProxy(..))
@@ -59,6 +60,9 @@ type State =
 
 _items :: forall a b r. Lens { items :: a | r } { items :: b | r } a b
 _items = prop (SProxy :: SProxy "items")
+
+_invalids :: forall a b r. Lens { invalids :: a | r } { invalids :: b | r } a b
+_invalids = prop (SProxy :: SProxy "invalids")
 
 _pager :: forall a b r. Lens { pager :: a | r } { pager :: b | r } a b
 _pager = prop (SProxy :: SProxy "pager")
@@ -266,8 +270,8 @@ eval = case _ of
     assign (_pager <<< _current) page
     eval $ Reload next
 
-build :: String -> Either String UserEntity
-build row = maybe (Left row) Right $ do
+build :: String -> Maybe UserEntity
+build row = do
   name <- cols !! 0
   code <- cols !! 1
   tel <- cols !! 2
@@ -277,22 +281,17 @@ build row = maybe (Left row) Right $ do
 
 
 tryCreate :: forall eff m.
-             Monad m =>
              MonadAff (ajax :: AJAX | eff) m =>
              MonadState State m =>
              Api.Client -> String -> m Unit
 tryCreate cli row = do
-  case build row of
-    Right user -> do
-      user_ <- H.liftAff $ attempt $ Users.create cli user
-      case user_ of
-        Right user__ -> do
-          items <- (_ <> [user__]) <$> H.gets _.items
-          H.modify _{ items = items }
-        Left _ -> do
-          invalids <- (_ <> [row]) <$> H.gets _.invalids
-          H.modify _{ invalids = invalids }
+  res <- runExceptT do
+    user <- Util.exceptNothing $ build row
+    Util.exceptLeft =<< (H.liftAff $ attempt $ Users.create cli user)
 
-    Left _ -> do
-      invalids <- (_ <> [row]) <$> H.gets _.invalids
-      H.modify _{ invalids = invalids }
+  case res of
+    Right user ->
+      modifying _items $ flip Array.snoc user
+
+    Left _ ->
+      modifying _invalids $ flip Array.snoc row
