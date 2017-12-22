@@ -23,6 +23,7 @@ import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
+import I18n.Ja as Ja
 import Model.Pest (Pest(..), PestEntity(..), PestId)
 import Model.Pest as Pest
 import Network.HTTP.Affjax (AJAX)
@@ -87,7 +88,7 @@ render state =
   HH.div_
   [
     HH.h1_
-    [ HH.text "Pest List" ]
+    [ HH.text Ja.pest_list ]
   , LoadingIndicator.render state.busy
   , HH.div
     [ HP.class_ $ H.ClassName "mb-2" ]
@@ -117,31 +118,17 @@ render state =
           HH.i [ HP.class_ $ H.ClassName "fa fa-times" ] []
         ]
       ]
-    renderItem_ (Pest { id, label }) =
-      HH.span
-      [ HP.class_ $ H.ClassName "badge badge-light mr-1" ]
-      [
-        HH.text label
-      ,
-        HH.button
-        [ HP.class_ $ H.ClassName "btn btn-link btn-sm"
-        , HE.onClick $ HE.input_ $ Destroy id
-        ]
-        [
-          HH.i [ HP.class_ $ H.ClassName "fa fa-times" ] []
-        ]
-      ]
 
     renderForm =
       HH.div_
       [
         HH.div
-        [ HP.class_ $ H.ClassName "mb-2" ]
+        [ HP.class_ $ H.ClassName "mb-1" ]
         [ HH.textarea
           [ HP.class_ $ H.ClassName "form-control"
           , HP.rows 4
           , HP.value state.populating
-          , HP.placeholder "Label"
+          , HP.placeholder Ja.pest_label
           , HE.onValueInput $ HE.input SetPopulating
           ]
         ]
@@ -155,7 +142,7 @@ render state =
       ]
       [
         HH.i [ HP.class_ $ H.ClassName "fa fa-plus mr-2" ] []
-      , HH.text "Populate"
+      , HH.text Ja.populate
       ]
 
 eval :: forall eff. Query ~> H.ComponentDSL State Query Message (Eff_ eff)

@@ -27,6 +27,7 @@ import Halogen.Component.ChildPath as CP
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
+import I18n.Ja as Ja
 import Model.User (User(..))
 import Network.HTTP.Affjax (AJAX)
 import Routing (matches)
@@ -123,7 +124,7 @@ render state =
         [ HP.class_ $ H.ClassName "navbar-brand mb-0"
         , HP.href "/#/"
         ]
-        [ HH.text "Higaidar" ]
+        [ HH.text Ja.higaidar ]
       , HH.ul
         [ HP.class_ $ H.ClassName "navbar-nav mr-auto" ]
         [
@@ -134,7 +135,7 @@ render state =
             [ HP.class_ $ H.ClassName "nav-link"
             , HP.href $ R.path $ R.UsersIndex
             ]
-            [ HH.text "Users" ]
+            [ HH.text Ja.user ]
           ]
         , HH.li
           [ HP.class_ $ H.ClassName "nav-item" ]
@@ -143,7 +144,7 @@ render state =
             [ HP.class_ $ H.ClassName "nav-link"
             , HP.href $ R.path $ R.PestsIndex
             ]
-            [ HH.text "Pests" ]
+            [ HH.text Ja.pest ]
           ]
         ]
       , renderUserName
@@ -180,7 +181,7 @@ render state =
             ]
             [
               HH.i [ HP.class_ $ H.ClassName "fa fa-fw fa-users mr-2" ] []
-            , HH.text "Users"
+            , HH.text Ja.user
             ]
           ]
         , HH.li
@@ -192,7 +193,7 @@ render state =
             ]
             [
               HH.i [ HP.class_ $ H.ClassName "fa fa-fw fa-bug mr-2" ] []
-            , HH.text "Pests"
+            , HH.text Ja.pest
             ]
           ]
         ]

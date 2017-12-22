@@ -27,6 +27,7 @@ import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
+import I18n.Ja as Ja
 import Model.User (User(User), UserEntity(UserEntity), UserId)
 import Model.User as User
 import Network.HTTP.Affjax (AJAX)
@@ -109,7 +110,7 @@ render state =
   HH.div_
   [
     HH.h1_
-    [ HH.text "User List" ]
+    [ HH.text Ja.user_list ]
   , LoadingIndicator.render state.busy
   , HH.table
     [ HP.class_ $ H.ClassName "table table-striped table-bordered table-hover table-sm mb-4" ]
@@ -130,11 +131,11 @@ render state =
         HH.td_
         []
       , HH.td_
-        [ HH.text "Name" ]
+        [ HH.text Ja.user_name ]
       , HH.td_
-        [ HH.text "Code" ]
+        [ HH.text Ja.user_code ]
       , HH.td_
-        [ HH.text "Tel" ]
+        [ HH.text Ja.user_tel ]
       , HH.td_
         []
       ]
@@ -179,12 +180,12 @@ render state =
       HH.div_
       [
         HH.div
-        [ HP.class_ $ H.ClassName "mb-2" ]
+        [ HP.class_ $ H.ClassName "mb-1" ]
         [ HH.textarea
           [ HP.class_ $ H.ClassName "form-control"
           , HP.rows 4
           , HP.value state.populating
-          , HP.placeholder "Name, Code, Tel"
+          , HP.placeholder $ Array.intercalate ", " [ Ja.user_name, Ja.user_code, Ja.user_tel ]
           , HE.onValueInput $ HE.input SetPopulating
           ]
         ]
@@ -198,7 +199,7 @@ render state =
       ]
       [
         HH.i [ HP.class_ $ H.ClassName "fa fa-plus mr-2" ] []
-      , HH.text "Populate"
+      , HH.text Ja.populate
       ]
 
 eval :: forall eff. Query ~> H.ParentDSL State Query ChildQuery ChildSlot Message (Eff_ eff)

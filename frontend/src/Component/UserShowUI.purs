@@ -20,6 +20,7 @@ import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import I18n as I18n
+import I18n.Ja as Ja
 import Model.User (User(User))
 import Model.User as User
 import Network.HTTP.Affjax (AJAX)
@@ -87,7 +88,7 @@ render state =
   HH.div_
   [
     HH.h1_
-    [ HH.text "User" ]
+    [ HH.text Ja.user ]
   , LoadingIndicator.render state.busy
   , HH.div
     [ HP.class_ $ H.ClassName "row" ]
@@ -123,7 +124,7 @@ render state =
       [ HP.class_ $ H.ClassName "btn btn-primary"
       , HE.onClick $ HE.input_ Submit
       ]
-      [ HH.text "Submit" ]
+      [ HH.text Ja.submit ]
 
     renderItem (User { id, code, tel, name, is_admin, created_at, updated_at }) =
       HH.div

@@ -13,13 +13,14 @@ import Data.Array as Array
 import Data.DateTime.Locale (Locale)
 import Data.Either (Either(Left, Right))
 import Data.Lens (view, (.~))
-import Data.Maybe (Maybe(Nothing, Just), fromMaybe, isJust, maybe)
+import Data.Maybe (Maybe(Nothing, Just), fromMaybe, isJust, isNothing, maybe)
 import Data.String as String
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Query.HalogenM as HM
+import I18n.Ja as Ja
 import Model.Pest (Pest(..))
 import Model.Photo (Photo(..), PhotoId, _original_url, _pest, _thumbnail_url)
 import Model.Photo as Photo
@@ -89,7 +90,7 @@ render state =
   [
     renderDeletingButton
   , HH.h1_
-    [ HH.text "Photo List" ]
+    [ HH.text Ja.photo_list ]
   , LoadingIndicator.render state.busy
   , HH.div
     [ HP.class_ $ H.ClassName "row no-gutters" ]
@@ -185,14 +186,20 @@ render state =
       [ HP.class_ $ H.ClassName "form-control"
       , HE.onValueChange $ HE.input $ SetPest photo
       ]
-      $ [
-        HH.option_ []
-        ] <> (renderPestOption (fromMaybe "" pest) <$> state.pests)
+      $ [ renderDefaultPestOption pest ]
+      <> (renderPestOption pest <$> state.pests)
+
+    renderDefaultPestOption selected =
+      HH.option
+      [ HP.enabled false
+      , HP.selected $ isNothing selected
+      ]
+      [ HH.text Ja.select_pest ]
 
     renderPestOption selected (Pest { label }) =
       HH.option
       [ HP.value $ label
-      , HP.selected $ selected == label
+      , HP.selected $ selected == Just label
       ]
       [ HH.text label ]
 

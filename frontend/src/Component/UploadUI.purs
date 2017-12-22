@@ -27,6 +27,7 @@ import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
+import I18n.Ja as Ja
 import Network.HTTP.Affjax (AJAX, URL)
 import Network.HTTP.Affjax as Affjax
 import Unsafe.Coerce (unsafeCoerce)
@@ -92,18 +93,18 @@ render state =
           , HE.onChange $ HE.input SetFile
           ]
         , HH.span
-          [ HP.class_ $ H.ClassName "btn btn-success rounded-circle" ]
+          [ HP.class_ $ H.ClassName "btn btn-success" ]
           [
-            HH.i [ HP.class_ $ H.ClassName "fa fa-plus" ] []
+            HH.text Ja.take_photo
           ]
         ]
       true ->
         HH.div_
         [
           HH.span
-          [ HP.class_ $ H.ClassName "btn btn-secondary rounded-circle disabled" ]
+          [ HP.class_ $ H.ClassName "btn btn-success disabled" ]
           [
-            HH.i [ HP.class_ $ H.ClassName "fa fa-plus" ] []
+            HH.text Ja.take_photo
           ]
         ]
 

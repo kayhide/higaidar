@@ -16,6 +16,7 @@ import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
+import I18n.Ja as Ja
 import Network.HTTP.Affjax (AJAX)
 
 
@@ -71,7 +72,7 @@ render state@({ form: Api.AuthenticateForm { code, tel } }) =
   HH.div_
   [
     HH.h1_
-    [ HH.text "Login" ]
+    [ HH.text Ja.login ]
   , LoadingIndicator.render state.busy
   , renderForm
   ]
@@ -104,7 +105,7 @@ render state@({ form: Api.AuthenticateForm { code, tel } }) =
         ]
         [
           HH.i [ HP.class_ $ H.ClassName "fa fa-sign-out fa-fw mr-1" ] []
-        , HH.text "Logout"
+        , HH.text Ja.logout
         ]
       false ->
         HH.button
@@ -113,7 +114,7 @@ render state@({ form: Api.AuthenticateForm { code, tel } }) =
         ]
         [
           HH.i [ HP.class_ $ H.ClassName "fa fa-sign-out fa-fw mr-1" ] []
-        , HH.text "Login"
+        , HH.text Ja.login
         ]
 
 eval :: forall eff. Query ~> H.ComponentDSL State Query Message (Eff_ eff)

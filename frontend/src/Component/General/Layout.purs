@@ -25,6 +25,7 @@ import Halogen.Data.Prism (type (<\/>), type (\/))
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
+import I18n.Ja as Ja
 import Model.User (User(..))
 import Network.HTTP.Affjax (AJAX)
 import Routing (matches)
@@ -107,7 +108,7 @@ render state =
       [ HP.class_ $ H.ClassName "navbar-brand mb-0"
       , HP.href $ R.path R.Home
       ]
-      [ HH.text "Higaidar" ]
+      [ HH.text Ja.higaidar ]
     , renderAdminMenu
     , renderUserName
     , renderLoginButton
