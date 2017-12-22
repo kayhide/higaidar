@@ -115,7 +115,7 @@ render state =
     ]
   , HH.slot' cpNotice NoticeUI.Slot NoticeUI.ui unit $ HE.input HandleNotice
   , HH.main
-    [ HP.class_ $ H.ClassName "container mt-2" ]
+    [ HP.class_ $ H.ClassName "container mt-2 mb-5" ]
     [
       renderPage state.location
     ]

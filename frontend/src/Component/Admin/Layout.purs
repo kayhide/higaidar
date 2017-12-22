@@ -105,7 +105,7 @@ render state =
     renderNavbar
   , HH.slot' cpNotice NoticeUI.Slot NoticeUI.ui unit $ HE.input HandleNotice
   , HH.main
-    [ HP.class_ $ H.ClassName "container mt-2" ]
+    [ HP.class_ $ H.ClassName "container mt-2 mb-5" ]
     [
       renderPage state.location
     ]
@@ -121,10 +121,15 @@ render state =
       [ HP.class_ $ H.ClassName "navbar navbar-expand navbar-dark bg-dark" ]
       [
         HH.a
-        [ HP.class_ $ H.ClassName "navbar-brand mb-0"
+        [ HP.class_ $ H.ClassName "navbar-brand mb-0 d-none d-sm-block"
         , HP.href "/#/"
         ]
         [ HH.text Ja.higaidar ]
+      , HH.a
+        [ HP.class_ $ H.ClassName "btn btn-sm btn-outline-secondary mr-3 d-block d-sm-none"
+        , HP.href "/#/"
+        ]
+        [ HH.text $ String.take 1 Ja.higaidar ]
       , HH.ul
         [ HP.class_ $ H.ClassName "navbar-nav mr-auto" ]
         [
@@ -135,7 +140,7 @@ render state =
             [ HP.class_ $ H.ClassName "nav-link"
             , HP.href $ R.path $ R.UsersIndex
             ]
-            [ HH.text Ja.user ]
+            $ renderTextOrIcon Ja.user "users"
           ]
         , HH.li
           [ HP.class_ $ H.ClassName "nav-item" ]
@@ -144,7 +149,7 @@ render state =
             [ HP.class_ $ H.ClassName "nav-link"
             , HP.href $ R.path $ R.PestsIndex
             ]
-            [ HH.text Ja.pest ]
+            $ renderTextOrIcon Ja.pest "bug"
           ]
         ]
       , renderUserName
@@ -156,6 +161,16 @@ render state =
         [
           HH.i [ HP.class_ $ H.ClassName "fa fa-user fa-fw" ] []
         ]
+      ]
+
+    renderTextOrIcon text icon =
+      [
+        HH.span
+        [ HP.class_ $ H.ClassName "d-none d-sm-inline" ]
+        [ HH.text text ]
+      , HH.i
+        [ HP.class_ $ H.ClassName $ "fa fa-fw fa-" <> icon <> " d-inline d-sm-none" ]
+        []
       ]
 
     renderUserName = case client of
