@@ -8,7 +8,7 @@ import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 
-render :: forall q. String -> String -> String -> (String -> Action q) -> H.ComponentHTML q
+render :: forall q p. String -> String -> String -> (String -> Action q) -> HH.HTML p (q Unit)
 render key label value query =
   HH.div
   [ HP.class_ $ H.ClassName "form-group" ]
