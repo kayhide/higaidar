@@ -8,23 +8,24 @@ import Component.Admin.Route as R
 import Component.HTML.LoadingIndicator as LoadingIndicator
 import Component.PagerUI (_count, _current)
 import Component.PagerUI as PagerUI
+import Component.PopulateUI as PopulateUI
 import Component.Util as Util
 import Control.Monad.Aff (Aff, attempt)
 import Control.Monad.Aff.Class (class MonadAff)
-import Control.Monad.Except (runExceptT)
-import Control.Monad.State (class MonadState)
 import Data.Array ((!!))
 import Data.Array as Array
+import Data.Const (Const)
 import Data.DateTime.Locale (Locale)
-import Data.Either (Either(Left, Right))
+import Data.Either (Either(Left, Right), hush)
 import Data.Lens (Lens, assign, modifying, view)
 import Data.Lens.Record (prop)
-import Data.Maybe (Maybe(Nothing, Just))
+import Data.Maybe (Maybe(Nothing, Just), maybe)
 import Data.String (Pattern(..))
 import Data.String as String
 import Data.Symbol (SProxy(..))
-import Data.Traversable (traverse_)
 import Halogen as H
+import Halogen.Component.ChildPath as CP
+import Halogen.Data.Prism (type (<\/>), type (\/))
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
@@ -43,26 +44,20 @@ data Query a
   = Initialize a
   | SetLocale Locale a
   | Reload a
-  | SetPopulating String a
-  | Populate a
   | Destroy UserId a
   | HandlePager PagerUI.Message a
+  | HandlePopulate (PopulateUI.Message User) a
 
 type State =
   { items :: Array User
   , client :: Api.Client
   , locale :: Locale
   , busy :: Boolean
-  , populating :: String
-  , invalids :: Array String
   , pager :: PagerUI.Pager
   }
 
 _items :: forall a b r. Lens { items :: a | r } { items :: b | r } a b
 _items = prop (SProxy :: SProxy "items")
-
-_invalids :: forall a b r. Lens { invalids :: a | r } { invalids :: b | r } a b
-_invalids = prop (SProxy :: SProxy "invalids")
 
 _pager :: forall a b r. Lens { pager :: a | r } { pager :: b | r } a b
 _pager = prop (SProxy :: SProxy "pager")
@@ -75,15 +70,28 @@ type Input =
 data Message
   = Failed String
 
-type ChildQuery = PagerUI.Query
-type ChildSlot = PagerUI.Slot
+type ChildQuery
+  = PagerUI.Query
+    <\/> PopulateUI.Query
+    <\/> Const Void
+
+type ChildSlot
+  = PagerUI.Slot
+    \/ PopulateUI.Slot
+    \/ Void
+
+cpPager :: CP.ChildPath PagerUI.Query ChildQuery PagerUI.Slot ChildSlot
+cpPager = CP.cp1
+
+cpPopulate :: CP.ChildPath PopulateUI.Query ChildQuery PopulateUI.Slot ChildSlot
+cpPopulate = CP.cp2
 
 type Eff_ eff = Aff (ajax :: AJAX | eff)
 
 ui :: forall eff. H.Component HH.HTML Query Input Message (Eff_ eff)
 ui =
   H.lifecycleParentComponent
-    { initialState: initialState
+    { initialState
     , render
     , eval
     , receiver: const Nothing
@@ -97,8 +105,6 @@ initialState { client, locale } =
   , client
   , locale
   , busy: false
-  , populating: ""
-  , invalids: []
   , pager
   }
   where
@@ -124,11 +130,16 @@ render state =
     , HH.tbody_
       $ renderItem <$> state.items
     ]
-  , HH.slot PagerUI.Slot PagerUI.ui state.pager $ HE.input HandlePager
-  , renderForm
+  , HH.slot' cpPager PagerUI.Slot PagerUI.ui state.pager $ HE.input HandlePager
+  , HH.slot' cpPopulate PopulateUI.Slot PopulateUI.ui populateInput $ HE.input HandlePopulate
   ]
 
   where
+    populateInput =
+      { creater: creater state.client
+      , placeholder: Array.intercalate ", " [ Ja.user_name, Ja.user_code, Ja.user_tel ]
+      }
+
     renderHeader =
       HH.tr_
       [
@@ -180,31 +191,6 @@ render state =
       else
         HH.span_ []
 
-    renderForm =
-      HH.div_
-      [
-        HH.div
-        [ HP.class_ $ H.ClassName "mb-1" ]
-        [ HH.textarea
-          [ HP.class_ $ H.ClassName "form-control"
-          , HP.rows 4
-          , HP.value state.populating
-          , HP.placeholder $ Array.intercalate ", " [ Ja.user_name, Ja.user_code, Ja.user_tel ]
-          , HE.onValueInput $ HE.input SetPopulating
-          ]
-        ]
-      , renderSubmitButton
-      ]
-
-    renderSubmitButton =
-      HH.button
-      [ HP.class_ $ H.ClassName "btn btn-success"
-      , HE.onClick $ HE.input_ Populate
-      ]
-      [
-        HH.i [ HP.class_ $ H.ClassName "fa fa-plus mr-2" ] []
-      , HH.text Ja.populate
-      ]
 
 eval :: forall eff. Query ~> H.ParentDSL State Query ChildQuery ChildSlot Message (Eff_ eff)
 eval = case _ of
@@ -226,29 +212,10 @@ eval = case _ of
         Right { body, range: { count } } -> do
           assign _items body
           assign (_pager <<< _count) count
-          void <<< H.query PagerUI.Slot <<< H.action <<< PagerUI.SetPager =<< H.gets _.pager
+          void <<< H.query' cpPager PagerUI.Slot <<< H.action <<< PagerUI.SetPager =<< H.gets _.pager
         Left _ ->
           H.raise $ Failed "Failed to access api."
-
-    pure next
-
-  SetPopulating s next -> do
-    H.modify _{ populating = s}
-    pure next
-
-  Populate next -> do
-    Util.whenNotBusy_ do
-      H.modify _{ invalids = [] }
-      text <- H.gets _.populating
-      let rows = Array.filter (not String.null) $ String.trim <$> String.split (Pattern "\n") text
-
-      cli <- H.gets _.client
-      traverse_ (tryCreate cli) rows
-
-      invalids <- H.gets _.invalids
-      H.modify _{ populating = String.joinWith "\r\n" invalids }
-      when (not $ Array.null invalids) do
-        H.raise $ Failed "Failed to create some users."
+      pure unit
 
     pure next
 
@@ -270,28 +237,23 @@ eval = case _ of
     assign (_pager <<< _current) page
     eval $ Reload next
 
-build :: String -> Maybe UserEntity
-build row = do
-  name <- cols !! 0
-  code <- cols !! 1
-  tel <- cols !! 2
-  pure $ UserEntity { name, code, tel, is_admin: false }
+  HandlePopulate (PopulateUI.Created user) next -> do
+    modifying _items $ flip Array.snoc user
+    pure next
+
+  HandlePopulate (PopulateUI.Failed _) next -> do
+    H.raise $ Failed "Failed to create some users."
+    pure next
+
+
+creater :: forall eff m. MonadAff (ajax :: AJAX | eff) m => Api.Client -> String -> m (Maybe User)
+creater cli row =
+  maybe (pure Nothing) (map hush <<< H.liftAff <<< attempt <<< Users.create cli) entity
+
   where
     cols = String.trim <$> String.split (Pattern ",") row
-
-
-tryCreate :: forall eff m.
-             MonadAff (ajax :: AJAX | eff) m =>
-             MonadState State m =>
-             Api.Client -> String -> m Unit
-tryCreate cli row = do
-  res <- runExceptT do
-    user <- Util.exceptNothing $ build row
-    Util.exceptLeft =<< (H.liftAff $ attempt $ Users.create cli user)
-
-  case res of
-    Right user ->
-      modifying _items $ flip Array.snoc user
-
-    Left _ ->
-      modifying _invalids $ flip Array.snoc row
+    entity = do
+      name <- cols !! 0
+      code <- cols !! 1
+      tel <- cols !! 2
+      pure $ UserEntity { name, code, tel, is_admin: false }
