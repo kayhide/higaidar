@@ -7,10 +7,11 @@ import Api.Users as Users
 import Component.HTML.Checkbox as Checkbox
 import Component.HTML.LoadingIndicator as LoadingIndicator
 import Component.HTML.TextField as TextField
+import Component.Util as Util
 import Control.Monad.Aff (Aff, attempt)
-import Control.Monad.Except (ExceptT, lift, runExceptT, throwError)
+import Control.Monad.Except (runExceptT)
 import Data.DateTime.Locale (Locale)
-import Data.Either (Either, either)
+import Data.Either (Either(Left, Right))
 import Data.Lens (Lens', _Just, assign, view)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(Just, Nothing), maybe)
@@ -141,9 +142,6 @@ render state =
             [ HH.text name ]
           , HH.div
             [ HP.class_ $ H.ClassName "card-text small" ]
-            [ HH.text name ]
-          , HH.div
-            [ HP.class_ $ H.ClassName "card-text small" ]
             [ HH.text code ]
           , HH.div
             [ HP.class_ $ H.ClassName "card-text small" ]
@@ -171,20 +169,18 @@ eval = case _ of
     pure next
 
   Reload next -> do
-    busy <- H.gets _.busy
-    when (not busy) do
-      H.modify _{ busy = true }
-      cli <- H.gets _.client
-      userId <- H.gets _.userId
+    Util.whenNotBusy_ do
+      { client, userId } <- H.get
       res <- runExceptT do
-        user <- onLeft "Failed to access api"
-                =<< (H.liftAff $ attempt $ Users.find cli userId)
-        lift do
+        Util.onLeft "Failed to load user."
+          =<< (H.liftAff $ attempt $ Users.find client userId)
+
+      case res of
+        Right user ->
           H.modify _{ user = Just user, editing = Just user }
+        Left msg ->
+          H.raise $ Failed msg
 
-      either (H.raise <<< Failed) pure res
-
-    H.modify _{ busy = false }
     pure next
 
   SetString attr v next -> do
@@ -196,26 +192,17 @@ eval = case _ of
     pure next
 
   Submit next -> do
-    busy <- H.gets _.busy
-    when (not busy) do
-      editing <- H.gets _.editing
-      case editing of
-        Just editing_ -> do
-          H.modify _{ busy = true }
-          cli <- H.gets _.client
-          userId <- H.gets _.userId
-          res <- runExceptT do
-            user <- onLeft "Failed to access api"
-                    =<< (H.liftAff $ attempt $ Users.update cli editing_)
-            lift do
-              H.modify _{ user = Just user, editing = Just user }
+    Util.whenNotBusy_ do
+      { client } <- H.get
+      res <- runExceptT do
+        editing <- Util.onNothing "User not loaded." =<< (H.gets _.editing)
+        Util.onLeft "Failed to update user."
+          =<< (H.liftAff $ attempt $ Users.update client editing)
 
-          either (H.raise <<< Failed) pure res
+      case res of
+        Right user ->
+          H.modify _{ user = Just user, editing = Just user }
+        Left msg ->
+          H.raise $ Failed msg
 
-        Nothing -> pure unit
-
-      H.modify _{ busy = false }
     pure next
-
-onLeft :: forall e m. Monad m => String -> Either e ~> ExceptT String m
-onLeft s = either (throwError <<< const s) pure
