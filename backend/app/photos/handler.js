@@ -55,7 +55,7 @@ module.exports.accept = (event, context, callback) => {
 
     const res = yield getObject({ Bucket: srcBucket, Key: key });
 
-    const runner = gm(res.Body).resize(200, 200, '^').gravity('Center').extent(200, 200)
+    const runner = gm(res.Body).autoOrient().resize(200, 200, '^').gravity('Center').extent(200, 200)
     const buffer = yield promisify(runner.toBuffer.bind(runner))(mimeType.split('/')[1]);
 
     yield putObject({
