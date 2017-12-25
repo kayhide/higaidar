@@ -35,6 +35,9 @@ take_photo = "写真を撮る"
 select_pest :: String
 select_pest = "病害虫名を選ぶ"
 
+no_pest :: String
+no_pest = "病害虫未選択"
+
 
 created_at :: String
 created_at = "作成日時"

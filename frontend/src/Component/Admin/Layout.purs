@@ -4,9 +4,10 @@ import Prelude
 
 import Api as Api
 import Component.Admin.PestListPage as PestListPage
+import Component.Admin.PhotoListPage as PhotoListPage
 import Component.Admin.Route as R
-import Component.Admin.UserListPage as UserListPage
 import Component.Admin.UserEditPage as UserEditPage
+import Component.Admin.UserListPage as UserListPage
 import Component.LoginUI as LoginUI
 import Component.NoticeUI as NoticeUI
 import Control.Monad.Aff (Aff)
@@ -41,6 +42,7 @@ data Query a
   | HandleLogin LoginUI.Message a
   | HandleUserList UserListPage.Message a
   | HandleUserEdit UserEditPage.Message a
+  | HandlePhotoList PhotoListPage.Message a
   | HandlePestList PestListPage.Message a
   | Goto R.Location a
 
@@ -60,6 +62,7 @@ type ChildQuery
     <\/> LoginUI.Query
     <\/> UserListPage.Query
     <\/> UserEditPage.Query
+    <\/> PhotoListPage.Query
     <\/> PestListPage.Query
     <\/> Const Void
 
@@ -68,6 +71,7 @@ type ChildSlot
     \/ LoginUI.Slot
     \/ UserListPage.Slot
     \/ UserEditPage.Slot
+    \/ PhotoListPage.Slot
     \/ PestListPage.Slot
     \/ Void
 
@@ -83,8 +87,11 @@ cpUserList = CP.cp3
 cpUserEdit :: CP.ChildPath UserEditPage.Query ChildQuery UserEditPage.Slot ChildSlot
 cpUserEdit = CP.cp4
 
+cpPhotoList :: CP.ChildPath PhotoListPage.Query ChildQuery PhotoListPage.Slot ChildSlot
+cpPhotoList = CP.cp5
+
 cpPestList :: CP.ChildPath PestListPage.Query ChildQuery PestListPage.Slot ChildSlot
-cpPestList = CP.cp5
+cpPestList = CP.cp6
 
 type Eff_ eff = Aff (ajax :: AJAX, dom :: DOM, now :: NOW, storage :: STORAGE | eff)
 
@@ -142,24 +149,9 @@ render state =
       , HH.ul
         [ HP.class_ $ H.ClassName "navbar-nav mr-auto" ]
         [
-          HH.li
-          [ HP.class_ $ H.ClassName "nav-item" ]
-          [
-            HH.a
-            [ HP.class_ $ H.ClassName "nav-link"
-            , HP.href $ R.path $ R.UsersIndex
-            ]
-            $ renderTextOrIcon Ja.user "users"
-          ]
-        , HH.li
-          [ HP.class_ $ H.ClassName "nav-item" ]
-          [
-            HH.a
-            [ HP.class_ $ H.ClassName "nav-link"
-            , HP.href $ R.path $ R.PestsIndex
-            ]
-            $ renderTextOrIcon Ja.pest "bug"
-          ]
+          renderMenuItem R.UsersIndex Ja.user "users"
+        , renderMenuItem R.PhotosIndex Ja.photo "picture-o"
+        , renderMenuItem R.PestsIndex Ja.pest "bug"
         ]
       , renderUserName
       , HH.a
@@ -170,6 +162,17 @@ render state =
         [
           HH.i [ HP.class_ $ H.ClassName "fa fa-user fa-fw" ] []
         ]
+      ]
+
+    renderMenuItem location text icon =
+      HH.li
+      [ HP.class_ $ H.ClassName "nav-item" ]
+      [
+        HH.a
+        [ HP.class_ $ H.ClassName "nav-link"
+        , HP.href $ R.path location
+        ]
+        $ renderTextOrIcon text icon
       ]
 
     renderTextOrIcon text icon =
@@ -213,6 +216,18 @@ render state =
           [
             HH.a
             [ HP.class_ $ H.ClassName "nav-link"
+            , HP.href $ R.path $ R.PhotosIndex
+            ]
+            [
+              HH.i [ HP.class_ $ H.ClassName "fa fa-fw fa-picture-o mr-2" ] []
+            , HH.text Ja.photo
+            ]
+          ]
+        , HH.li
+          [ HP.class_ $ H.ClassName "nav-item" ]
+          [
+            HH.a
+            [ HP.class_ $ H.ClassName "nav-link"
             , HP.href $ R.path $ R.PestsIndex
             ]
             [
@@ -232,6 +247,10 @@ render state =
       R.UsersShow userId ->
         withAuthentication
         $ HH.slot' cpUserEdit UserEditPage.Slot UserEditPage.ui { userId, client, locale } $ HE.input HandleUserEdit
+
+      R.PhotosIndex ->
+        withAuthentication
+        $ HH.slot' cpPhotoList PhotoListPage.Slot PhotoListPage.ui { client, locale } $ HE.input HandlePhotoList
 
       R.PestsIndex ->
         withAuthentication
@@ -275,6 +294,10 @@ eval = case _ of
     pure next
 
   HandleUserEdit (UserEditPage.Failed s) next -> do
+    postAlert s
+    pure next
+
+  HandlePhotoList (PhotoListPage.Failed s) next -> do
     postAlert s
     pure next
 
