@@ -29,7 +29,7 @@ describe('token', () => {
     let event;
     let handle;
     let user;
-    const attrs = { code: 1703, tel: '03-3624-4700' };
+    const attrs = { code: '1703', tel: '03-3624-4700' };
 
     beforeEach(() => co(function *() {
       const handler = proxyquire('app/token/handler', helper.stub);
@@ -59,7 +59,7 @@ describe('token', () => {
 
     context('with wrong attrs', () => {
       beforeEach(() => {
-        event.body = JSON.stringify({ code: 9999, tel: '00-0000-0000' });
+        event.body = JSON.stringify({ code: '9999', tel: '00-0000-0000' });
       });
 
       it('returns 401', () => {
@@ -72,7 +72,7 @@ describe('token', () => {
 
     context('with partially correct attrs', () => {
       beforeEach(() => {
-        event.body = JSON.stringify({ code: 1703 });
+        event.body = JSON.stringify({ code: '1703' });
       });
 
       it('returns 401', () => {

@@ -52,8 +52,8 @@ describe('users', () => {
 
       it('orders by code', () => {
         return co(function *() {
-          const user1 = yield factory.create(User, { code: 5 });
-          const user2 = yield factory.create(User, { code: 2 });
+          const user1 = yield factory.create(User, { code: '5' });
+          const user2 = yield factory.create(User, { code: '2' });
           const users = [user2, user1];
 
           const res = yield handle(event, {})
@@ -107,7 +107,7 @@ describe('users', () => {
 
     context('with valid attrs', () => {
       const attrs = {
-        code: 100,
+        code: '100',
         name: 'Taro',
         tel: '0123-4567-8900'
       };
@@ -228,7 +228,7 @@ describe('users', () => {
 
     context('with valid attrs', () => {
       const attrs = {
-        code: 200,
+        code: '200',
         name: 'Jiro',
         tel: '0123-4567-9000'
       };
