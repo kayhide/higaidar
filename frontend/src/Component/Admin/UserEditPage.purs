@@ -12,7 +12,7 @@ import Control.Monad.Aff (Aff, attempt)
 import Control.Monad.Except (runExceptT)
 import Data.DateTime.Locale (Locale)
 import Data.Either (Either(Left, Right))
-import Data.Lens (Lens', _Just, assign, view)
+import Data.Lens (Lens', (^.), _Just, assign, to, view)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(Just, Nothing), maybe)
 import Data.Symbol (SProxy(..))
@@ -20,6 +20,7 @@ import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
+import I18n as I18n
 import I18n.Ja as Ja
 import Model.User (User)
 import Model.User as User
@@ -98,6 +99,9 @@ render state =
 
   where
     modified = state.user /= state.editing
+    localize = I18n.localizeDateTime state.locale
+    created_at = state ^. _editing <<< _Just <<< User._created_at <<< to localize
+    updated_at = state ^. _editing <<< _Just <<< User._updated_at <<< to localize
 
     renderForm =
       HH.div
@@ -107,6 +111,8 @@ render state =
       , renderInput "user-name" Ja.user_name User._name
       , renderInput "user-tel" Ja.user_tel User._tel
       , renderCheckbox "user-is_admin" Ja.user_admin User._is_admin
+      , renderStatic "user-created_at" Ja.created_at created_at
+      , renderStatic "user-updated_at" Ja.updated_at updated_at
       , HH.hr_
       , HH.div
         [ HP.class_ $ H.ClassName "d-flex mt-2" ]
@@ -123,6 +129,23 @@ render state =
     renderCheckbox :: String -> String -> Lens' User Boolean -> H.ComponentHTML Query
     renderCheckbox key label attr =
       Checkbox.render key label (maybe false (view attr) state.editing) $ SetBoolean attr
+
+    renderStatic key label value =
+      HH.div
+      [ HP.class_ $ H.ClassName "form-group" ]
+      [
+        HH.label
+        [ HP.class_ $ H.ClassName "col-form-label"
+        , HP.for key
+        ]
+        [ HH.text label ]
+      , HH.input
+        [ HP.class_ $ H.ClassName "form-control form-control-plaintext"
+        , HP.id_ key
+        , HP.value value
+        , HP.readOnly true
+        ]
+      ]
 
     renderSubmitButton =
       HH.button

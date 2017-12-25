@@ -36,6 +36,12 @@ select_pest :: String
 select_pest = "病害虫名を選ぶ"
 
 
+created_at :: String
+created_at = "作成日時"
+
+updated_at :: String
+updated_at = "更新日時"
+
 user :: String
 user = "ユーザー"
 
