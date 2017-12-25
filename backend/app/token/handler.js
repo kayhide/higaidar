@@ -47,6 +47,7 @@ module.exports.authorize = (event, context, callback) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const effects = [
       [decoded.user.is_admin ? 'Allow' : 'Deny', ['users', 'users/*']],
+      [decoded.user.is_admin ? 'Allow' : 'Deny', ['photos', 'photos/*']],
       [decoded.user.is_admin ? 'Allow' : 'Deny', ['pests', 'pests/*']],
       ['Allow', ['my/*']]
     ];
