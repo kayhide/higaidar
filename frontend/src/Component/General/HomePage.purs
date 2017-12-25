@@ -1,4 +1,4 @@
-module Component.MyPhotoListUI where
+module Component.General.HomePage where
 
 import Prelude
 
@@ -13,7 +13,7 @@ import Data.Array as Array
 import Data.DateTime.Locale (Locale)
 import Data.Either (Either(Left, Right))
 import Data.Lens (view, (.~))
-import Data.Maybe (Maybe(Nothing, Just), fromMaybe, isJust, isNothing, maybe)
+import Data.Maybe (Maybe(Just, Nothing), isJust, isNothing, maybe)
 import Data.String as String
 import Halogen as H
 import Halogen.HTML as HH

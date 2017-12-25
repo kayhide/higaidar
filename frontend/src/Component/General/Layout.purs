@@ -3,12 +3,11 @@ module Component.General.Layout where
 import Prelude
 
 import Api as Api
+import Component.General.HomePage as HomePage
 import Component.General.Route as R
 import Component.LoginUI as LoginUI
-import Component.MyPhotoListUI as MyPhotoListUI
 import Component.NoticeUI as NoticeUI
-import Control.Monad.Aff (Aff, launchAff_)
-import Control.Monad.Eff (Eff)
+import Control.Monad.Aff (Aff)
 import Control.Monad.Eff.Now (NOW)
 import Control.Monad.Eff.Now as Now
 import DOM (DOM)
@@ -19,7 +18,6 @@ import Data.String as String
 import Data.Time.Duration (Minutes(..))
 import Dom.Storage (STORAGE)
 import Halogen as H
-import Halogen.Aff as HA
 import Halogen.Component.ChildPath as CP
 import Halogen.Data.Prism (type (<\/>), type (\/))
 import Halogen.HTML as HH
@@ -28,7 +26,6 @@ import Halogen.HTML.Properties as HP
 import I18n.Ja as Ja
 import Model.User (User(..))
 import Network.HTTP.Affjax (AJAX)
-import Routing (matches)
 import Routing.Hash as Routing
 
 
@@ -39,9 +36,8 @@ type AppConfig =
 
 data Query a
   = Initialize a
-  | HandleNotice NoticeUI.Message a
   | HandleLogin LoginUI.Message a
-  | HandleMyPhotoList MyPhotoListUI.Message a
+  | HandleHome HomePage.Message a
   | Goto R.Location a
 
 type State =
@@ -58,13 +54,13 @@ type Message = Void
 type ChildQuery
   = NoticeUI.Query
     <\/> LoginUI.Query
-    <\/> MyPhotoListUI.Query
+    <\/> HomePage.Query
     <\/> Const Void
 
 type ChildSlot
   = NoticeUI.Slot
     \/ LoginUI.Slot
-    \/ MyPhotoListUI.Slot
+    \/ HomePage.Slot
     \/ Void
 
 cpNotice :: CP.ChildPath NoticeUI.Query ChildQuery NoticeUI.Slot ChildSlot
@@ -73,8 +69,8 @@ cpNotice = CP.cp1
 cpLogin :: CP.ChildPath LoginUI.Query ChildQuery LoginUI.Slot ChildSlot
 cpLogin = CP.cp2
 
-cpMyPhotoList :: CP.ChildPath MyPhotoListUI.Query ChildQuery MyPhotoListUI.Slot ChildSlot
-cpMyPhotoList = CP.cp3
+cpHome :: CP.ChildPath HomePage.Query ChildQuery HomePage.Slot ChildSlot
+cpHome = CP.cp3
 
 type Eff_ eff = Aff (ajax :: AJAX, dom :: DOM, now :: NOW, storage :: STORAGE | eff)
 
@@ -113,7 +109,7 @@ render state =
     , renderUserName
     , renderLoginButton
     ]
-  , HH.slot' cpNotice NoticeUI.Slot NoticeUI.ui unit $ HE.input HandleNotice
+  , HH.slot' cpNotice NoticeUI.Slot NoticeUI.ui unit $ const Nothing
   , HH.main
     [ HP.class_ $ H.ClassName "container mt-2 mb-5" ]
     [
@@ -166,7 +162,7 @@ render state =
 
       R.Home ->
         withAuthentication
-        $ HH.slot' cpMyPhotoList MyPhotoListUI.Slot MyPhotoListUI.ui { client, locale } $ HE.input HandleMyPhotoList
+        $ HH.slot' cpHome HomePage.Slot HomePage.ui { client, locale } $ HE.input HandleHome
 
     withAuthentication html =
       if Api.isAuthenticated client
@@ -186,9 +182,6 @@ eval = case _ of
 
     pure next
 
-  HandleNotice (NoticeUI.Closed i) next -> do
-    pure next
-
   HandleLogin (LoginUI.Authenticated client) next -> do
     H.modify _{ apiClient = client }
     postInfo "Authenticated."
@@ -204,7 +197,7 @@ eval = case _ of
     postAlert s
     pure next
 
-  HandleMyPhotoList (MyPhotoListUI.Failed s) next -> do
+  HandleHome (HomePage.Failed s) next -> do
     postAlert s
     pure next
 
@@ -217,11 +210,3 @@ eval = case _ of
       void $ H.query' cpNotice NoticeUI.Slot $ H.action $ NoticeUI.Post notice
     postInfo s = postNotice $ NoticeUI.Info s
     postAlert s = postNotice $ NoticeUI.Alert s
-
-
-
-matchRoute :: forall eff. H.HalogenIO Query Void (Aff (HA.HalogenEffects eff))
-              -> Eff (HA.HalogenEffects eff) Unit
-matchRoute driver = matches R.routing $ redirects
-  where
-    redirects _ = launchAff_ <<< driver.query <<< H.action <<< Goto

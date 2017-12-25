@@ -1,4 +1,4 @@
-module Component.PestListUI where
+module Component.Admin.PestListPage where
 
 import Prelude
 

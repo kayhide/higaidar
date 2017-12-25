@@ -3,34 +3,31 @@ module Component.Admin.Layout where
 import Prelude
 
 import Api as Api
+import Component.Admin.PestListPage as PestListPage
 import Component.Admin.Route as R
+import Component.Admin.UserListPage as UserListPage
+import Component.Admin.UserEditPage as UserEditPage
 import Component.LoginUI as LoginUI
 import Component.NoticeUI as NoticeUI
-import Component.PestListUI as PestListUI
-import Component.UserListUI as UserListUI
-import Component.UserShowUI as UserShowUI
-import Control.Monad.Aff (Aff, launchAff_)
-import Control.Monad.Eff (Eff)
+import Control.Monad.Aff (Aff)
 import Control.Monad.Eff.Now (NOW)
 import Control.Monad.Eff.Now as Now
 import DOM (DOM)
+import Data.Const (Const)
 import Data.DateTime.Locale (Locale(..), LocaleName(..))
-import Data.Either.Nested (Either5)
-import Data.Functor.Coproduct.Nested (Coproduct5)
 import Data.Maybe (Maybe(Just, Nothing))
 import Data.String as String
 import Data.Time.Duration (Minutes(..))
 import Dom.Storage (STORAGE)
 import Halogen as H
-import Halogen.Aff as HA
 import Halogen.Component.ChildPath as CP
+import Halogen.Data.Prism (type (<\/>), type (\/))
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import I18n.Ja as Ja
 import Model.User (User(..))
 import Network.HTTP.Affjax (AJAX)
-import Routing (matches)
 import Routing.Hash as Routing
 
 
@@ -41,11 +38,10 @@ type AppConfig =
 
 data Query a
   = Initialize a
-  | HandleNotice NoticeUI.Message a
   | HandleLogin LoginUI.Message a
-  | HandleUserList UserListUI.Message a
-  | HandleUserShow UserShowUI.Message a
-  | HandlePestList PestListUI.Message a
+  | HandleUserList UserListPage.Message a
+  | HandleUserEdit UserEditPage.Message a
+  | HandlePestList PestListPage.Message a
   | Goto R.Location a
 
 type State =
@@ -59,8 +55,21 @@ type Input = AppConfig
 
 type Message = Void
 
-type ChildQuery = Coproduct5 NoticeUI.Query LoginUI.Query UserListUI.Query UserShowUI.Query PestListUI.Query
-type ChildSlot = Either5 NoticeUI.Slot LoginUI.Slot UserListUI.Slot UserShowUI.Slot PestListUI.Slot
+type ChildQuery
+  = NoticeUI.Query
+    <\/> LoginUI.Query
+    <\/> UserListPage.Query
+    <\/> UserEditPage.Query
+    <\/> PestListPage.Query
+    <\/> Const Void
+
+type ChildSlot
+  = NoticeUI.Slot
+    \/ LoginUI.Slot
+    \/ UserListPage.Slot
+    \/ UserEditPage.Slot
+    \/ PestListPage.Slot
+    \/ Void
 
 cpNotice :: CP.ChildPath NoticeUI.Query ChildQuery NoticeUI.Slot ChildSlot
 cpNotice = CP.cp1
@@ -68,13 +77,13 @@ cpNotice = CP.cp1
 cpLogin :: CP.ChildPath LoginUI.Query ChildQuery LoginUI.Slot ChildSlot
 cpLogin = CP.cp2
 
-cpUserList :: CP.ChildPath UserListUI.Query ChildQuery UserListUI.Slot ChildSlot
+cpUserList :: CP.ChildPath UserListPage.Query ChildQuery UserListPage.Slot ChildSlot
 cpUserList = CP.cp3
 
-cpUserShow :: CP.ChildPath UserShowUI.Query ChildQuery UserShowUI.Slot ChildSlot
-cpUserShow = CP.cp4
+cpUserEdit :: CP.ChildPath UserEditPage.Query ChildQuery UserEditPage.Slot ChildSlot
+cpUserEdit = CP.cp4
 
-cpPestList :: CP.ChildPath PestListUI.Query ChildQuery PestListUI.Slot ChildSlot
+cpPestList :: CP.ChildPath PestListPage.Query ChildQuery PestListPage.Slot ChildSlot
 cpPestList = CP.cp5
 
 type Eff_ eff = Aff (ajax :: AJAX, dom :: DOM, now :: NOW, storage :: STORAGE | eff)
@@ -103,7 +112,7 @@ render state =
   HH.div_
   [
     renderNavbar
-  , HH.slot' cpNotice NoticeUI.Slot NoticeUI.ui unit $ HE.input HandleNotice
+  , HH.slot' cpNotice NoticeUI.Slot NoticeUI.ui unit $ const Nothing
   , HH.main
     [ HP.class_ $ H.ClassName "container mt-2 mb-5" ]
     [
@@ -218,15 +227,15 @@ render state =
 
       R.UsersIndex ->
         withAuthentication
-        $ HH.slot' cpUserList UserListUI.Slot UserListUI.ui { client, locale } $ HE.input HandleUserList
+        $ HH.slot' cpUserList UserListPage.Slot UserListPage.ui { client, locale } $ HE.input HandleUserList
 
       R.UsersShow userId ->
         withAuthentication
-        $ HH.slot' cpUserShow UserShowUI.Slot UserShowUI.ui { userId, client, locale } $ HE.input HandleUserShow
+        $ HH.slot' cpUserEdit UserEditPage.Slot UserEditPage.ui { userId, client, locale } $ HE.input HandleUserEdit
 
       R.PestsIndex ->
         withAuthentication
-        $ HH.slot' cpPestList PestListUI.Slot PestListUI.ui { client, locale } $ HE.input HandlePestList
+        $ HH.slot' cpPestList PestListPage.Slot PestListPage.ui { client, locale } $ HE.input HandlePestList
 
     withAuthentication html =
       if isAuthenticated
@@ -246,9 +255,6 @@ eval = case _ of
 
     pure next
 
-  HandleNotice (NoticeUI.Closed i) next -> do
-    pure next
-
   HandleLogin (LoginUI.Authenticated client) next -> do
     H.modify _{ apiClient = client }
     postInfo "Authenticated."
@@ -264,15 +270,15 @@ eval = case _ of
     postAlert s
     pure next
 
-  HandleUserList (UserListUI.Failed s) next -> do
+  HandleUserList (UserListPage.Failed s) next -> do
     postAlert s
     pure next
 
-  HandleUserShow (UserShowUI.Failed s) next -> do
+  HandleUserEdit (UserEditPage.Failed s) next -> do
     postAlert s
     pure next
 
-  HandlePestList (PestListUI.Failed s) next -> do
+  HandlePestList (PestListPage.Failed s) next -> do
     postAlert s
     pure next
 
@@ -285,11 +291,3 @@ eval = case _ of
       void $ H.query' cpNotice NoticeUI.Slot $ H.action $ NoticeUI.Post notice
     postInfo s = postNotice $ NoticeUI.Info s
     postAlert s = postNotice $ NoticeUI.Alert s
-
-
-
-matchRoute :: forall eff. H.HalogenIO Query Void (Aff (HA.HalogenEffects eff))
-              -> Eff (HA.HalogenEffects eff) Unit
-matchRoute driver = matches R.routing $ redirects
-  where
-    redirects _ = launchAff_ <<< driver.query <<< H.action <<< Goto

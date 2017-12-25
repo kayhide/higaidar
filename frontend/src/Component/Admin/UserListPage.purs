@@ -1,4 +1,4 @@
-module Component.UserListUI where
+module Component.Admin.UserListPage where
 
 import Prelude
 
