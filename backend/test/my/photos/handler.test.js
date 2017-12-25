@@ -117,44 +117,6 @@ describe('my/photos', () => {
     });
   });
 
-  describe('#create', () => {
-    let handle;
-    beforeEach(() => {
-      handle = promisify(handler.create.bind(handler));
-    });
-
-    context('with valid attrs', () => {
-      const attrs = {};
-
-      beforeEach(() => {
-        event.body = JSON.stringify(attrs);
-      });
-
-      it('creates a new photo', () => {
-        return co(function *() {
-          const org = yield Photo.count();
-          yield handle(event, {});
-          const cur = yield Photo.count();
-          assert(org === 0);
-          assert(cur === 1);
-
-          const photo = yield Photo.findOne();
-          assert(_.isMatch(photo.dataValues, attrs));
-        });
-      });
-
-      it('returns attributes of the new photo', () => {
-        return co(function *() {
-          const res = yield handle(event, {});
-          assert(res.statusCode === 200);
-
-          const body = JSON.parse(res.body);
-          assert(_.isMatch(body, attrs));
-        });
-      });
-    });
-  });
-
   describe('#show', () => {
     let handle;
     let photo;

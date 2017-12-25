@@ -43,22 +43,6 @@ module.exports.index = (event, context, callback) => {
   }).catch(handleError(callback));
 };
 
-module.exports.create = (event, context, callback) => {
-  // console.log(util.inspect(event, { depth: 5 }));
-  context.callbackWaitsForEmptyEventLoop = false;
-
-  co(function *() {
-    const params = JSON.parse(event.body);
-    const data = yield model.with(m => co(function *() {
-      const user = yield getUser(m, event).then(verify.presence);
-      return user.createPhoto(params);
-    }));
-
-    handleSuccess(callback)(data.dataValues);
-
-  }).catch(handleError(callback));
-};
-
 module.exports.show = (event, context, callback) => {
   // console.log(util.inspect(event, { depth: 5 }));
   context.callbackWaitsForEmptyEventLoop = false;

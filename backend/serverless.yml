@@ -103,6 +103,42 @@ functions:
           cors: true
           authorizer: authorize
 
+  photos-index:
+    handler: app/photos/handler.index
+    events:
+      - http:
+          path: photos
+          method: get
+          cors: true
+          authorizer: authorize
+
+  photos-show:
+    handler: app/photos/handler.show
+    events:
+      - http:
+          path: photos/{id}
+          method: get
+          cors: true
+          authorizer: authorize
+
+  photos-update:
+    handler: app/photos/handler.update
+    events:
+      - http:
+          path: photos/{id}
+          method: patch
+          cors: true
+          authorizer: authorize
+
+  photos-destroy:
+    handler: app/photos/handler.destroy
+    events:
+      - http:
+          path: photos/{id}
+          method: delete
+          cors: true
+          authorizer: authorize
+
   pests-index:
     handler: app/pests/handler.index
     events:
@@ -154,15 +190,6 @@ functions:
       - http:
           path: my/photos
           method: get
-          cors: true
-          authorizer: authorize
-
-  my-photos-create:
-    handler: app/my/photos/handler.create
-    events:
-      - http:
-          path: my/photos
-          method: post
           cors: true
           authorizer: authorize
 

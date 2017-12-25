@@ -1,5 +1,6 @@
 'use strict';
 
+const _ = require('lodash');
 const co = require('co');
 const promisify = require('util.promisify');
 const path = require('path');
@@ -11,27 +12,29 @@ const s3 = new AWS.S3();
 
 const getObject = promisify(s3.getObject.bind(s3));
 const putObject = promisify(s3.putObject.bind(s3));
+const deleteObject = promisify(s3.deleteObject.bind(s3));
 
 const gm = require('gm').subClass({ imageMagick: true });
 
 const verify = require('app/verify');
+const handleSuccess = require('app/handleSuccess');
+const handleError = require('app/handleError');
 const model = require('app/model');
 
+const srcBucket = `${process.env.RESOURCE_PREFIX}photos`;
+const dstBucket = `${process.env.RESOURCE_PREFIX}photos-thumbnail`;
 
 module.exports.accept = (event, context, callback) => {
   // console.log(util.inspect(event, { depth: 5 }));
   context.callbackWaitsForEmptyEventLoop = false;
 
-  const srcBucket = event.Records[0].s3.bucket.name;
-  const key = event.Records[0].s3.object.key;
-  const dstBucket = `${srcBucket}-thumbnail`;
-
-  if (srcBucket != `${process.env.RESOURCE_PREFIX}photos`) {
+  if (event.Records[0].s3.bucket.name != srcBucket) {
     callback("Source bucket is not right.");
     return;
   }
 
-  var mimeType = mime.lookup(key);
+  const key = event.Records[0].s3.object.key;
+  const mimeType = mime.lookup(key);
   if (mimeType != "image/jpeg" && mimeType != "image/png") {
     callback(`Unsupported image type: ${mimeType}`);
     return;
@@ -72,4 +75,78 @@ module.exports.accept = (event, context, callback) => {
     console.log(err);
     callback('Failed to accept photo.');
   });
+};
+
+
+module.exports.index = (event, context, callback) => {
+  // console.log(util.inspect(event, { depth: 5 }));
+  context.callbackWaitsForEmptyEventLoop = false;
+
+  co(function *() {
+    const { offset, limit } = Object.assign(
+      { offset: 0, limit: 50 },
+      _.mapValues(
+        _.pick(event.queryStringParameters, 'offset', 'limit'),
+        parseInt
+      ));
+    const { data, total } = yield model.with(m => co(function *() {
+      const data = yield m.Photo.findAll({ order: [['id', 'DESC']], offset, limit });
+      const total = yield m.Photo.count();
+      return { data, total: total || 0 };
+    }));
+
+    const items = data.map(item => item.dataValues);
+    handleSuccess(callback)(items, { offset, limit, total });
+
+  }).catch(handleError(callback));
+};
+
+module.exports.show = (event, context, callback) => {
+  // console.log(util.inspect(event, { depth: 5 }));
+  context.callbackWaitsForEmptyEventLoop = false;
+
+  co(function *() {
+    const id = event.pathParameters.id;
+    const data = yield model.with(m => co(function *() {
+      return m.Photo.findById(id).then(verify.presence)
+    }));
+
+    handleSuccess(callback)(data.dataValues);
+
+  }).catch(handleError(callback));
+};
+
+module.exports.update = (event, context, callback) => {
+  // console.log(util.inspect(event, { depth: 5 }));
+  context.callbackWaitsForEmptyEventLoop = false;
+
+  co(function *() {
+    const id = event.pathParameters.id;
+    const params = JSON.parse(event.body);
+    const data = yield model.with(m => co(function *() {
+      return m.Photo.findById(id).then(verify.presence)
+        .then(u => u.update(params));
+    }));
+
+    handleSuccess(callback)(data.dataValues);
+
+  }).catch(handleError(callback));
+};
+
+module.exports.destroy = (event, context, callback) => {
+  // console.log(util.inspect(event, { depth: 5 }));
+  context.callbackWaitsForEmptyEventLoop = false;
+
+  co(function *() {
+    const id = event.pathParameters.id;
+    const data = yield model.with(m => co(function *() {
+      const photo = yield m.Photo.findById(id).then(verify.presence)
+      yield photo.destroy();
+      yield deleteObject({ Bucket: srcBucket, Key: photo.key });
+      yield deleteObject({ Bucket: dstBucket, Key: photo.key });
+    }));
+
+    handleSuccess(callback)(null);
+
+  }).catch(handleError(callback));
 };
