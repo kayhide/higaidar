@@ -50,7 +50,7 @@ module.exports.accept = (event, context, callback) => {
     const photo = yield model.with(m => co(function *() {
       const user = yield m.User.findById(userId).then(verify.presence);
       const original_url = `${process.env.PHOTOS_LOCATION}${key}`;
-      return yield user.createPhoto({ key, original_url });
+      return user.createPhoto({ key, original_url });
     }));
 
     const res = yield getObject({ Bucket: srcBucket, Key: key });
@@ -67,7 +67,7 @@ module.exports.accept = (event, context, callback) => {
     });
     yield model.with(m => co(function *() {
       const thumbnail_url = `${process.env.PHOTOS_THUMBNAIL_LOCATION}${key}`;
-      return yield photo.update({ thumbnail_url });
+      return photo.update({ thumbnail_url });
     }));
   }).then(() => {
     callback(null, 'Photo accepted.');

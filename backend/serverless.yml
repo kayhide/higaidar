@@ -139,6 +139,16 @@ functions:
           cors: true
           authorizer: authorize
 
+  photos-thumbnail-create:
+    handler: app/photos/thumbnail/handler.create
+    events:
+      - http:
+          path: photos/{id}/thumbnail
+          method: put
+          cors: true
+          authorizer: authorize
+
+
   pests-index:
     handler: app/pests/handler.index
     events:
