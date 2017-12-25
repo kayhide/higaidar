@@ -20,9 +20,8 @@ import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
-import I18n as I18n
 import I18n.Ja as Ja
-import Model.User (User(User))
+import Model.User (User)
 import Model.User as User
 import Network.HTTP.Affjax (AJAX)
 
@@ -39,6 +38,7 @@ data Query a
   | SetString (Lens' User String) String a
   | SetBoolean (Lens' User Boolean) Boolean a
   | Submit a
+  | Revert a
 
 type State =
   { userId :: Int
@@ -94,22 +94,26 @@ render state =
   , HH.div
     [ HP.class_ $ H.ClassName "row" ]
     [ renderForm ]
-  , HH.div
-    [ HP.class_ $ H.ClassName "row" ]
-    $ maybe [] (pure <<< renderItem) state.editing
-    <> maybe [] (pure <<< renderItem) state.user
   ]
 
   where
+    modified = state.user /= state.editing
+
     renderForm =
       HH.div
-      [ HP.class_ $ H.ClassName "col-md-12 mb-4" ]
+      [ HP.class_ $ H.ClassName "col-md-12" ]
       [
-        renderInput "user-code" "Code" User._code
-      , renderInput "user-name" "Name" User._name
-      , renderInput "user-tel" "Tel" User._tel
-      , renderCheckbox "user-is_admin" "Admin" User._is_admin
-      , renderSubmitButton
+        renderInput "user-code" Ja.user_code User._code
+      , renderInput "user-name" Ja.user_name User._name
+      , renderInput "user-tel" Ja.user_tel User._tel
+      , renderCheckbox "user-is_admin" Ja.user_admin User._is_admin
+      , HH.hr_
+      , HH.div
+        [ HP.class_ $ H.ClassName "d-flex mt-2" ]
+        [
+          renderSubmitButton
+        , renderRevertButton
+        ]
       ]
 
     renderInput :: String -> String -> Lens' User String -> H.ComponentHTML Query
@@ -122,42 +126,17 @@ render state =
 
     renderSubmitButton =
       HH.button
-      [ HP.class_ $ H.ClassName "btn btn-primary"
+      [ HP.class_ $ H.ClassName $ "btn btn-primary" <> if modified then "" else " disabled"
       , HE.onClick $ HE.input_ Submit
       ]
       [ HH.text Ja.submit ]
 
-    renderItem (User { id, code, tel, name, is_admin, created_at, updated_at }) =
-      HH.div
-      [ HP.class_ $ H.ClassName "col-sm-6 mb-2" ]
-      [
-        HH.div
-        [ HP.class_ $ H.ClassName "card" ]
-        [
-          HH.div
-          [ HP.class_ $ H.ClassName "card-body" ]
-          [
-            HH.div
-            [ HP.class_ $ H.ClassName "card-text small" ]
-            [ HH.text name ]
-          , HH.div
-            [ HP.class_ $ H.ClassName "card-text small" ]
-            [ HH.text code ]
-          , HH.div
-            [ HP.class_ $ H.ClassName "card-text small" ]
-            [ HH.text tel ]
-          , HH.div
-            [ HP.class_ $ H.ClassName "card-text small" ]
-            [ HH.text $ show is_admin ]
-          , HH.div
-            [ HP.class_ $ H.ClassName "card-text text-muted small" ]
-            [ HH.text $ I18n.localizeDateTime state.locale created_at ]
-          , HH.div
-            [ HP.class_ $ H.ClassName "card-text text-muted small" ]
-            [ HH.text $ I18n.localizeDateTime state.locale updated_at ]
-          ]
-        ]
+    renderRevertButton =
+      HH.button
+      [ HP.class_ $ H.ClassName $ "ml-auto btn btn-secondary" <> if modified then "" else " disabled"
+      , HE.onClick $ HE.input_ Revert
       ]
+      [ HH.text Ja.revert ]
 
 eval :: forall eff. Query ~> H.ComponentDSL State Query Message (Eff_ eff)
 eval = case _ of
@@ -204,5 +183,14 @@ eval = case _ of
           H.modify _{ user = Just user, editing = Just user }
         Left msg ->
           H.raise $ Failed msg
+
+    pure next
+
+  Revert next -> do
+    H.gets _.user >>= case _ of
+      Just user -> do
+        H.modify _{ editing = Just user }
+      Nothing ->
+        H.raise $ Failed "User not loaded."
 
     pure next

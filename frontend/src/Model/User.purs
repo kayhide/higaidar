@@ -56,6 +56,7 @@ _updated_at :: Lens' User DateTime
 _updated_at = _User <<< prop (SProxy :: SProxy "updated_at")
 
 
+derive instance eqUser :: Eq User
 derive instance genericUser :: Generic User _
 instance showUser :: Show User where
   show = genericShow

@@ -19,6 +19,9 @@ populate = "一括登録"
 submit :: String
 submit = "送信"
 
+revert :: String
+revert = "撤回"
+
 
 photo :: String
 photo = "写真"
@@ -47,6 +50,9 @@ user_code = "顧客番号"
 
 user_tel :: String
 user_tel = "電話番号"
+
+user_admin :: String
+user_admin = "管理者"
 
 
 pest :: String
