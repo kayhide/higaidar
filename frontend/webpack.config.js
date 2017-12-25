@@ -5,6 +5,7 @@ const CleanupPlugin = require('webpack-cleanup-plugin');
 const ExtractTextPlugin = require('extract-text-webpack-plugin');
 const HtmlPlugin = require('html-webpack-plugin');
 const HtmlExcludeAssetsPlugin = require('html-webpack-exclude-assets-plugin');
+const CopyPlugin = require('copy-webpack-plugin');
 
 const OmitPlugin = require('./lib/omit-webpack-plugin');
 const helper = require('./lib/helper');
@@ -89,18 +90,19 @@ module.exports = {
     ...Object.keys(entries.regular).map(k => new HtmlPlugin({
       filename: (k === 'index') ? 'index.html' : `${k}/index.html`,
       template: `./static/${k}.html`,
-      favicon: './static/favicon.ico',
       chunks: [k]
     })),
 
     ...Object.keys(entries.static).map(k => new HtmlPlugin({
       filename: `${k}.html`,
       template: `./static/${k}.html`,
-      favicon: './static/favicon.ico',
       chunks: [k],
       excludeAssets: [/.*\.js/]
     })),
 
+    new CopyPlugin([
+      './static/favicon.ico'
+    ]),
     new HtmlExcludeAssetsPlugin(),
     new CleanupPlugin(),
     new OmitPlugin({
