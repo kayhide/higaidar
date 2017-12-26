@@ -92,6 +92,22 @@ describe('users', () => {
         });
       });
     });
+
+    context('with id param', () => {
+      it('filters by id', () => {
+        return co(function *() {
+          const users = yield factory.createList(User, 3);
+          event.queryStringParameters = {
+            id: `in(${users[0].id},${users[2].id})`
+          };
+          const res = yield handle(event, {})
+          const body = JSON.parse(res.body);
+          assert(body.length === 2);
+          assert(helper.isEqualModel(body[0], users[0]));
+          assert(helper.isEqualModel(body[1], users[2]));
+        });
+      });
+    });
   });
 
   describe('#create', () => {

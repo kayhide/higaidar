@@ -5,6 +5,7 @@ const co = require('co');
 const util = require('util');
 
 const verify = require('app/verify');
+const parseFilter = require('app/parseFilter');
 const handleSuccess = require('app/handleSuccess');
 const handleError = require('app/handleError');
 const model = require('app/model');
@@ -21,14 +22,13 @@ module.exports.index = (event, context, callback) => {
         _.pick(event.queryStringParameters, 'offset', 'limit'),
         parseInt
       ));
-    const { data, total } = yield model.with(m => co(function *() {
-      const data = yield m.User.findAll({ order: [['code', 'ASC']], offset, limit });
-      const total = yield m.User.count();
-      return { data, total }
+    const where = parseFilter(_.pick(event.queryStringParameters, 'id'));
+    const data = yield model.with(m => co(function *() {
+      return m.User.findAndCountAll({ order: [['code', 'ASC']], offset, limit, where });
     }));
 
-    const users = data.map(u => u.dataValues);
-    handleSuccess(callback)(users, { offset, limit, total });
+    const users = data.rows.map(item => item.dataValues);
+    handleSuccess(callback)(users, { offset, limit, total: data.count });
 
   }).catch(handleError(callback));
 };
