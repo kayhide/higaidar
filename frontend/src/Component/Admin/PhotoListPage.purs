@@ -3,6 +3,7 @@ module Component.Admin.PhotoListPage where
 import Prelude
 
 import Api as Api
+import Api.Photos (Filtering(..))
 import Api.Photos as Photos
 import Api.Users as Users
 import Component.HTML.LoadingIndicator as LoadingIndicator
@@ -12,11 +13,13 @@ import Control.Monad.Aff (Aff, attempt)
 import Data.Array as Array
 import Data.DateTime.Locale (Locale)
 import Data.Either (Either(Left, Right))
-import Data.Lens (view)
+import Data.Lens ((^?), view)
+import Data.Lens.Index (ix)
 import Data.Map (Map)
 import Data.Map as Map
-import Data.Maybe (Maybe(Nothing, Just), maybe)
+import Data.Maybe (Maybe(Nothing, Just), fromMaybe, maybe)
 import Data.Profunctor.Strong ((&&&))
+import Data.StrMap as StrMap
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
@@ -40,6 +43,8 @@ data Query a
   | Reload a
   | Destroy PhotoId a
   | ToggleDeleting a
+  | SelectUser UserId a
+  | UnselectUser UserId a
 
 type State =
   { items :: Array Photo
@@ -48,6 +53,7 @@ type State =
   , locale :: Locale
   , deleting :: Boolean
   , busy :: Boolean
+  , selectedUsers :: Array UserId
   }
 
 type Input =
@@ -81,6 +87,7 @@ ui =
       , locale
       , deleting: false
       , busy: false
+      , selectedUsers: []
       }
 
 render :: forall eff. State -> H.ParentHTML Query ChildQuery ChildSlot (Eff_ eff)
@@ -92,6 +99,12 @@ render state =
     [ HH.text Ja.photo_list ]
   , LoadingIndicator.render state.busy
   , HH.div
+    [ HP.class_ $ H.ClassName "mb-2" ]
+    [
+      HH.div_
+      $ renderFiltering <$> state.selectedUsers
+    ]
+  , HH.div
     [ HP.class_ $ H.ClassName "row no-gutters" ]
     $ renderItem <$> state.items
   ]
@@ -99,6 +112,26 @@ render state =
   where
     client = state.client
     deleting = state.deleting
+
+    renderFiltering userId =
+      HH.div
+      [ HP.class_ $ H.ClassName "btn-group mr-2" ]
+      [
+        HH.span
+        [ HP.class_ $ H.ClassName "input-group-addon" ]
+        [
+          HH.i [ HP.class_ $ H.ClassName "fa fa-user mr-2" ] []
+        , HH.text $ fromMaybe "..." $ state.users ^? (ix userId <<< User._name)
+        ]
+      , HH.a
+        [ HP.class_ $ H.ClassName "btn btn-secondary btn-outline"
+        , HP.href $ "#/photos"
+        , HE.onClick $ HE.input_ $ UnselectUser userId
+        ]
+        [
+          HH.i [ HP.class_ $ H.ClassName "fa fa-times" ] []
+        ]
+      ]
 
     renderDeletingButton =
       HH.div
@@ -147,9 +180,12 @@ render state =
       ]
 
     renderUser = case _ of
-      Just (User { name }) ->
-        HH.small
-        [ HP.class_ $ H.ClassName "ml-auto" ]
+      Just (User { id, name }) ->
+        HH.a
+        [ HP.class_ $ H.ClassName "ml-auto small"
+        , HP.href $ "#/photos?user_id=" <> show id
+        , HE.onClick $ HE.input_ $ SelectUser id
+        ]
         [
           HH.i [ HP.class_ $ H.ClassName "fa fa-user mr-2" ] []
         , HH.text name
@@ -192,8 +228,12 @@ eval = case _ of
 
   Reload next -> do
     Util.whenNotBusy_ do
-      cli <- H.gets _.client
-      photos <- H.liftAff $ attempt $ Photos.index cli
+      { client, selectedUsers } <- H.get
+      photos <- case selectedUsers of
+        [] -> do
+          H.liftAff $ attempt $ Photos.index client
+        _ ->
+          H.liftAff $ attempt $ Photos.filter client $ StrMap.singleton "user_id" $ In_ selectedUsers
 
       case photos of
         Right photos_ -> do
@@ -222,6 +262,20 @@ eval = case _ of
     deleting <- not <$> H.gets _.deleting
     H.modify _{ deleting = deleting }
     pure next
+
+  SelectUser userId next -> do
+    { selectedUsers } <- H.get
+    case selectedUsers of
+      [userId] ->
+        pure next
+      _ -> do
+        H.modify _{ selectedUsers = Array.nub $ Array.cons userId selectedUsers }
+        eval $ Reload next
+
+  UnselectUser userId next -> do
+    { selectedUsers } <- H.get
+    H.modify _{ selectedUsers = Array.delete userId selectedUsers }
+    eval $ Reload next
 
 loadUsers :: forall eff. H.ParentDSL State Query ChildQuery ChildSlot Message (Eff_ eff) Unit
 loadUsers = do
