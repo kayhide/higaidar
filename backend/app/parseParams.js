@@ -3,8 +3,13 @@
 const _ = require('lodash');
 
 const parseFilter = s => {
-  const m = s.match(/(in)\((.+)\)/);
-  return m[2].split(',');
+  const m = s.match(/(in|eq)\((.+)\)/);
+  switch (m[1]) {
+  case 'in':
+    return m[2].split(',');
+  case 'eq':
+    return m[2];
+  }
 };
 
 module.exports = e => {

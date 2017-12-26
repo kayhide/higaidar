@@ -186,6 +186,53 @@ describe('photos', () => {
         });
       });
     });
+
+    context('with filtering params', () => {
+      it('filters by user_id', () => {
+        return co(function *() {
+          const photos = yield factory.createList(Photo, 3, { user_id: user.id });
+          const photos_ = _.reverse(photos);
+
+          const somebody = yield factory.create(User);
+          yield factory.createList(Photo, 2, { user_id: somebody.id });
+
+          event.queryStringParameters = {
+            user_id: `eq(${user.id})`
+          };
+          const res = yield handle(event, {})
+          assert(res.headers['Content-Range'] === '0-2/3');
+
+          const body = JSON.parse(res.body);
+          assert(body.length === 3);
+          assert(helper.isEqualModel(body[0], photos_[0]));
+          assert(helper.isEqualModel(body[1], photos_[1]));
+          assert(helper.isEqualModel(body[2], photos_[2]));
+        });
+      });
+
+      it('filters by pest', () => {
+        return co(function *() {
+          const pest = "Creutsfeldt Jakob";
+          const photos = yield factory.createList(Photo, 3, { user_id: user.id, pest });
+          const photos_ = _.reverse(photos);
+
+          yield factory.createList(Photo, 2, { user_id: user.id });
+
+          event.queryStringParameters = {
+            pest: `eq(${pest})`
+          };
+
+          const res = yield handle(event, {})
+          assert(res.headers['Content-Range'] === '0-2/3');
+
+          const body = JSON.parse(res.body);
+          assert(body.length === 3);
+          assert(helper.isEqualModel(body[0], photos_[0]));
+          assert(helper.isEqualModel(body[1], photos_[1]));
+          assert(helper.isEqualModel(body[2], photos_[2]));
+        });
+      });
+    });
   });
 
   describe('#show', () => {
