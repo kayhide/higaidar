@@ -4,6 +4,7 @@ import Prelude
 
 import Api as Api
 import Api.Photos as Photos
+import Api.Users as Users
 import Component.HTML.LoadingIndicator as LoadingIndicator
 import Component.UploadUI as UploadUI
 import Component.Util as Util
@@ -12,14 +13,20 @@ import Data.Array as Array
 import Data.DateTime.Locale (Locale)
 import Data.Either (Either(Left, Right))
 import Data.Lens (view)
+import Data.Map (Map)
+import Data.Map as Map
 import Data.Maybe (Maybe(Nothing, Just), maybe)
+import Data.Profunctor.Strong ((&&&))
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
+import Halogen.Query.HalogenM as HM
 import I18n.Ja as Ja
 import Model.Photo (Photo(Photo), PhotoId)
 import Model.Photo as Photo
+import Model.User (User(..), UserId)
+import Model.User as User
 import Network.HTTP.Affjax (AJAX)
 
 
@@ -36,6 +43,7 @@ data Query a
 
 type State =
   { items :: Array Photo
+  , users :: Map UserId User
   , client :: Api.Client
   , locale :: Locale
   , deleting :: Boolean
@@ -68,6 +76,7 @@ ui =
   where
     initialState { client, locale } =
       { items: []
+      , users: Map.empty
       , client
       , locale
       , deleting: false
@@ -103,10 +112,11 @@ render state =
         ]
       ]
 
-    renderItem photo@(Photo { id, original_url, thumbnail_url, pest, created_at }) =
+    renderItem photo@(Photo { id, user_id, original_url, thumbnail_url, pest, created_at }) =
       HH.div
       [ HP.class_ $ H.ClassName "col-md-2 col-sm-4 col-6 pb-2" ]
-      [ HH.div
+      [
+        HH.div
         [ HP.class_ $ H.ClassName "card position-relative" ]
         [
           HH.a
@@ -116,10 +126,16 @@ render state =
           ]
         , renderDeleteButton id
         , HH.div
+          [ HP.class_ $ H.ClassName "d-flex p-2 bg-light text-secondary" ]
+          [
+            HH.small_
+            [ HH.text $ show id ]
+          , renderUser $ Map.lookup user_id state.users
+          ]
+        , HH.div
           [ HP.class_ $ H.ClassName "card-body" ]
           [
-            HH.text $ show id
-          , renderPest pest
+            renderPest pest
           ]
         ]
       ]
@@ -129,6 +145,19 @@ render state =
       [ HP.src url
       , HP.class_ $ H.ClassName "card-img-top"
       ]
+
+    renderUser = case _ of
+      Just (User { name }) ->
+        HH.small
+        [ HP.class_ $ H.ClassName "ml-auto" ]
+        [
+          HH.i [ HP.class_ $ H.ClassName "fa fa-user mr-2" ] []
+        , HH.text name
+        ]
+      Nothing ->
+        HH.small
+        [ HP.class_ $ H.ClassName "ml-auto text-muted" ]
+        [ HH.text "..." ]
 
     renderPest = case _ of
       Just pest ->
@@ -167,8 +196,9 @@ eval = case _ of
       photos <- H.liftAff $ attempt $ Photos.index cli
 
       case photos of
-        Right photos_ ->
+        Right photos_ -> do
           H.modify _{ items = photos_ }
+          void $ HM.fork loadUsers
         Left _ ->
           H.raise $ Failed "Failed to access api."
 
@@ -192,3 +222,20 @@ eval = case _ of
     deleting <- not <$> H.gets _.deleting
     H.modify _{ deleting = deleting }
     pure next
+
+loadUsers :: forall eff. H.ParentDSL State Query ChildQuery ChildSlot Message (Eff_ eff) Unit
+loadUsers = do
+  { items, users } <- H.get
+  let ids = Array.difference (Array.nub $ view Photo._user_id <$> items) (Array.fromFoldable $ Map.keys users)
+
+  when (not Array.null ids) $ do
+    cli <- H.gets _.client
+    res <- H.liftAff $ attempt $ Users.some cli ids
+
+    case res of
+      Right users_ -> do
+        let addings = Map.fromFoldable $ (view User._id &&& id) <$> users_
+        H.modify _{ users = Map.union users addings }
+      Left _ -> do
+        H.raise $ Failed "Failed to load Users. Retrying..."
+        loadUsers

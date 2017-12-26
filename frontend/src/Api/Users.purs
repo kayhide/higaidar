@@ -32,6 +32,12 @@ find cli userId = Api.get cli path
   where
     path = "/users/" <> show userId
 
+some :: forall eff. Client -> Array UserId -> Aff (ajax :: AJAX | eff) (Array User)
+some cli ids = Api.get cli path
+  where
+    path = "/users?id=in(" <> (Array.intercalate "," $ show <$> ids) <> ")"
+
+
 create :: forall eff. Client -> UserEntity -> Aff (ajax :: AJAX | eff) User
 create cli user = Api.post cli path user
   where
