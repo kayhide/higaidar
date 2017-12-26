@@ -17,6 +17,7 @@ const deleteObject = promisify(s3.deleteObject.bind(s3));
 const gm = require('gm').subClass({ imageMagick: true });
 
 const verify = require('app/verify');
+const parseParams = require('app/parseParams');
 const handleSuccess = require('app/handleSuccess');
 const handleError = require('app/handleError');
 const model = require('app/model');
@@ -83,12 +84,8 @@ module.exports.index = (event, context, callback) => {
   context.callbackWaitsForEmptyEventLoop = false;
 
   co(function *() {
-    const { offset, limit } = Object.assign(
-      { offset: 0, limit: 50 },
-      _.mapValues(
-        _.pick(event.queryStringParameters, 'offset', 'limit'),
-        parseInt
-      ));
+    const params = parseParams(event);
+    const { offset, limit } = params.pager({ offset: 0, limit: 50 });
     const data = yield model.with(m => co(function *() {
       return m.Photo.findAndCountAll({ order: [['id', 'DESC']], offset, limit });
     }));
