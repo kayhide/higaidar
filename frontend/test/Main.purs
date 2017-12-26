@@ -32,7 +32,7 @@ testAuthenticateSuccess = do
   cli_ <- Token.authenticate cli form
   logShow $ cli_ ^. Api._token
   where
-    code = 100
+    code = "100"
     tel = "03-1234-5678"
     form = Api.AuthenticateForm { code, tel }
     cli = Api.makeClient apiEndpoint
@@ -42,7 +42,7 @@ testAuthenticateFail = do
   res <- attempt $ Token.authenticate cli form
   logShow res
   where
-    code = 20
+    code = "20"
     tel = "03-1234-5678"
     form = Api.AuthenticateForm { code, tel }
     cli = Api.makeClient apiEndpoint
