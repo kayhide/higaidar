@@ -111,9 +111,8 @@ render state =
   , HH.div
     [ HP.class_ $ H.ClassName "mb-2" ]
     [
-
-   HH.div_
-    $ renderItem <$> state.items
+      HH.div_
+      $ renderItem <$> state.items
     ]
   , HH.slot' cpPopulate PopulateUI.Slot PopulateUI.ui populateInput $ HE.input HandlePopulate
   ]
