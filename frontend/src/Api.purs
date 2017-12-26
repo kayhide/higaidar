@@ -12,9 +12,11 @@ import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.HTTP.Method (Method(..))
 import Data.Lens (Lens', lens, (^.))
+import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..), maybe)
 import Data.Newtype (class Newtype, unwrap, wrap)
 import Data.String as String
+import Data.Symbol (SProxy(..))
 import Model.User (User)
 import Network.HTTP.Affjax (AJAX, AffjaxRequest, AffjaxResponse, URL)
 import Network.HTTP.Affjax as Affjax
@@ -53,11 +55,21 @@ type UserCode = String
 type UserTel = String
 type AuthenticationToken = String
 
-newtype AuthenticateForm
-  = AuthenticateForm
-    { code :: UserCode
+type AuthenticateFormRec
+  = { code :: UserCode
     , tel :: UserTel
     }
+newtype AuthenticateForm = AuthenticateForm AuthenticateFormRec
+
+_AuthenticateForm :: Lens' AuthenticateForm AuthenticateFormRec
+_AuthenticateForm = lens (\(AuthenticateForm r) -> r) (\_ r -> AuthenticateForm r)
+
+_code :: Lens' AuthenticateForm UserCode
+_code = _AuthenticateForm <<< prop (SProxy :: SProxy "code")
+
+_tel :: Lens' AuthenticateForm UserTel
+_tel = _AuthenticateForm <<< prop (SProxy :: SProxy "tel")
+
 derive instance genericAuthenticateForm :: Generic AuthenticateForm _
 instance showAuthenticateForm :: Show AuthenticateForm where
   show = genericShow

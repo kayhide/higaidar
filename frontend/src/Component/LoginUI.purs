@@ -5,11 +5,15 @@ import Prelude
 import Api as Api
 import Api.Token as Token
 import Component.HTML.LoadingIndicator as LoadingIndicator
+import Component.HTML.TextField as TextField
 import Component.Util as Util
 import Control.Monad.Aff (Aff, attempt)
 import Control.Monad.Except (runExceptT)
 import Data.Either (Either(Left, Right))
+import Data.Lens (Lens', assign, view)
+import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(Nothing, Just))
+import Data.Symbol (SProxy(..))
 import Dom.Storage (STORAGE)
 import Dom.Storage as Storage
 import Halogen as H
@@ -32,10 +36,14 @@ type State =
   , busy :: Boolean
   }
 
+_form :: Lens' State Api.AuthenticateForm
+_form = prop (SProxy :: SProxy "form")
+
 data Query a
   = Initialize a
   | Authenticate a
   | Unauthenticate a
+  | SetString (Lens' Api.AuthenticateForm String) String a
   | SetCode String a
   | SetTel String a
 
@@ -84,38 +92,40 @@ render state@({ form: Api.AuthenticateForm { code, tel } }) =
       HH.div
       [ HP.class_ $ H.ClassName "form" ]
       [
-        HH.input
-        [ HP.class_ $ H.ClassName "form-control mr-2"
-        , HP.value code
-        , HE.onValueInput $ HE.input SetCode
+        renderInput "user-code" Ja.user_code Api._code
+      , renderInput "user-tel" Ja.user_tel Api._tel
+      , HH.hr_
+      , HH.div
+        [ HP.class_ $ H.ClassName "d-flex mt-2" ]
+        [
+          renderLoginButton
+        , renderLogoutButton
         ]
-      , HH.input
-        [ HP.class_ $ H.ClassName "form-control mr-2"
-        , HP.value tel
-        , HE.onValueInput $ HE.input SetTel
-        ]
-      , renderButton
       ]
 
-    renderButton = case isAuthenticated of
-      true ->
-        HH.button
-        [ HP.class_ $ H.ClassName $ "btn btn-secondary"
-        , HE.onClick $ HE.input_ Unauthenticate
-        ]
-        [
-          HH.i [ HP.class_ $ H.ClassName "fa fa-sign-out fa-fw mr-1" ] []
-        , HH.text Ja.logout
-        ]
-      false ->
-        HH.button
-        [ HP.class_ $ H.ClassName $ "btn btn-outline-secondary"
-        , HE.onClick $ HE.input_ Authenticate
-        ]
-        [
-          HH.i [ HP.class_ $ H.ClassName "fa fa-sign-out fa-fw mr-1" ] []
-        , HH.text Ja.login
-        ]
+    renderInput :: String -> String -> Lens' Api.AuthenticateForm String -> H.ComponentHTML Query
+    renderInput key label attr =
+      TextField.render key label (view attr state.form) $ SetString attr
+
+    renderLoginButton =
+      HH.button
+      [ HP.class_ $ H.ClassName $ "btn btn-outline-secondary" <> if isAuthenticated then " disabled" else ""
+      , HE.onClick $ HE.input_ Authenticate
+      ]
+      [
+        HH.i [ HP.class_ $ H.ClassName "fa fa-sign-in fa-fw mr-1" ] []
+      , HH.text Ja.login
+      ]
+
+    renderLogoutButton =
+      HH.button
+      [ HP.class_ $ H.ClassName $ "ml-auto btn btn-secondary" <> if isAuthenticated then "" else " disabled"
+      , HE.onClick $ HE.input_ Unauthenticate
+      ]
+      [
+        HH.i [ HP.class_ $ H.ClassName "fa fa-sign-out fa-fw mr-1" ] []
+      , HH.text Ja.logout
+      ]
 
 eval :: forall eff. Query ~> H.ComponentDSL State Query Message (Eff_ eff)
 eval = case _ of
@@ -159,6 +169,10 @@ eval = case _ of
     H.modify _{ client = cli }
     H.raise $ Unauthenticated $ cli
 
+    pure next
+
+  SetString attr v next -> do
+    assign (_form <<< attr) v
     pure next
 
   SetCode code next -> do
