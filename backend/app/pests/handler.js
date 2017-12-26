@@ -21,14 +21,12 @@ module.exports.index = (event, context, callback) => {
         _.pick(event.queryStringParameters, 'offset', 'limit'),
         parseInt
       ));
-    const { data, total } = yield model.with(m => co(function *() {
-      const data = yield m.Pest.findAll({ order: [['id', 'ASC']], offset, limit });
-      const total = yield m.Pest.count();
-      return { data, total }
+    const data = yield model.with(m => co(function *() {
+      return m.Pest.findAndCountAll({ order: [['id', 'ASC']], offset, limit });
     }));
 
-    const pests = data.map(u => u.dataValues);
-    handleSuccess(callback)(pests, { offset, limit, total });
+    const items = data.rows.map(item => item.dataValues);
+    handleSuccess(callback)(items, { offset, limit, total: data.count });
 
   }).catch(handleError(callback));
 };

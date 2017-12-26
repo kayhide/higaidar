@@ -30,15 +30,14 @@ module.exports.index = (event, context, callback) => {
         _.pick(event.queryStringParameters, 'offset', 'limit'),
         parseInt
       ));
-    const { data, total } = yield model.with(m => co(function *() {
+    const data = yield model.with(m => co(function *() {
       const user = yield getUser(m, event).then(verify.presence);
-      const data = yield user.getPhotos({ order: [['id', 'DESC']], offset, limit });
-      const total = yield user.countPhotos();
-      return { data, total: total || 0 };
+      const where = { user_id: user.id }
+      return m.Photo.findAndCountAll({ where, order: [['id', 'DESC']], offset, limit });
     }));
 
-    const items = data.map(u => u.dataValues);
-    handleSuccess(callback)(items, { offset, limit, total });
+    const items = data.rows.map(item => item.dataValues);
+    handleSuccess(callback)(items, { offset, limit, total: data.count });
 
   }).catch(handleError(callback));
 };
