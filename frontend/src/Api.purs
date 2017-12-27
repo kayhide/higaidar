@@ -15,8 +15,11 @@ import Data.Lens (Lens', lens, (^.))
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..), maybe)
 import Data.Newtype (class Newtype, unwrap, wrap)
+import Data.StrMap (StrMap)
+import Data.StrMap as StrMap
 import Data.String as String
 import Data.Symbol (SProxy(..))
+import Global (encodeURI)
 import Model.User (User)
 import Network.HTTP.Affjax (AJAX, AffjaxRequest, AffjaxResponse, URL)
 import Network.HTTP.Affjax as Affjax
@@ -191,3 +194,16 @@ pickContentRange res = do
       void $ P.char '/'
       count <- P.int
       pure { first, last, count }
+
+
+
+data Filtering = Eq_ String | In_ (Array String)
+
+type FilteringMap = StrMap Filtering
+
+querify :: Filtering -> String
+querify (Eq_ x) = "eq(" <> (encodeURI x) <> ")"
+querify (In_ xs) = "in(" <> (Array.intercalate "," $ map encodeURI xs) <> ")"
+
+buildQuery :: FilteringMap -> String
+buildQuery = Array.intercalate "&" <<< StrMap.mapWithKey (\k v -> encodeURI k <> "=" <> querify v)
