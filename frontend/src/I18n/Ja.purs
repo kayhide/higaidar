@@ -38,6 +38,8 @@ select_pest = "病害虫名を選ぶ"
 no_pest :: String
 no_pest = "病害虫未選択"
 
+without_hyphen :: String
+without_hyphen = "ハイフンなし"
 
 created_at :: String
 created_at = "作成日時"
@@ -55,7 +57,7 @@ user_name :: String
 user_name = "名前"
 
 user_code :: String
-user_code = "顧客番号"
+user_code = "お客様コード"
 
 user_tel :: String
 user_tel = "電話番号"

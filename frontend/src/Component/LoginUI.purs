@@ -93,7 +93,7 @@ render state@({ form: Api.AuthenticateForm { code, tel } }) =
       [ HP.class_ $ H.ClassName "form" ]
       [
         renderInput "user-code" Ja.user_code Api._code
-      , renderInput "user-tel" Ja.user_tel Api._tel
+      , renderInputWithHelp "user-tel" Ja.user_tel Ja.without_hyphen Api._tel
       , HH.hr_
       , HH.div
         [ HP.class_ $ H.ClassName "d-flex mt-2" ]
@@ -106,6 +106,10 @@ render state@({ form: Api.AuthenticateForm { code, tel } }) =
     renderInput :: String -> String -> Lens' Api.AuthenticateForm String -> H.ComponentHTML Query
     renderInput key label attr =
       TextField.render key label (view attr state.form) $ SetString attr
+
+    renderInputWithHelp :: String -> String -> String -> Lens' Api.AuthenticateForm String -> H.ComponentHTML Query
+    renderInputWithHelp key label help attr =
+      TextField.renderWithHelp key label (view attr state.form) help $ SetString attr
 
     renderLoginButton =
       HH.button
