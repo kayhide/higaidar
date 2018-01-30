@@ -293,3 +293,10 @@ if ENV['ON_REMOTE']
 end
 
 StandaloneMigrations::Tasks.load_tasks
+
+
+task :pry => [:environment] do
+  class User < ActiveRecord::Base; end
+  class Pest < ActiveRecord::Base; end
+  binding.pry
+end
