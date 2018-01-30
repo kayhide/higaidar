@@ -113,29 +113,16 @@ describe('token', () => {
         return co(function *() {
           const res = yield handle(event, {});
           const statements = res.policyDocument.Statement;
-          assert(statements.length === 4);
+          assert(statements.length === 2);
           assert(statements[0].Action === 'execute-api:Invoke');
-          assert(statements[0].Effect === 'Deny');
+          assert(statements[0].Effect === 'Allow');
           assert(_.isEqual(statements[0].Resource, [
-            'arn:aws:execute-api:ap-northheast-1::api-id/test/*/users',
-            'arn:aws:execute-api:ap-northheast-1::api-id/test/*/users/*',
+            'arn:aws:execute-api:ap-northheast-1::api-id/test/GET/pests'
           ]));
           assert(statements[1].Action === 'execute-api:Invoke');
-          assert(statements[1].Effect === 'Deny');
+          assert(statements[1].Effect === 'Allow');
           assert(_.isEqual(statements[1].Resource, [
-            'arn:aws:execute-api:ap-northheast-1::api-id/test/*/photos',
-            'arn:aws:execute-api:ap-northheast-1::api-id/test/*/photos/*',
-          ]));
-          assert(statements[2].Action === 'execute-api:Invoke');
-          assert(statements[2].Effect === 'Deny');
-          assert(_.isEqual(statements[2].Resource, [
-            'arn:aws:execute-api:ap-northheast-1::api-id/test/*/pests',
-            'arn:aws:execute-api:ap-northheast-1::api-id/test/*/pests/*',
-          ]));
-          assert(statements[3].Action === 'execute-api:Invoke');
-          assert(statements[3].Effect === 'Allow');
-          assert(_.isEqual(statements[3].Resource, [
-            'arn:aws:execute-api:ap-northheast-1::api-id/test/*/my/*',
+            'arn:aws:execute-api:ap-northheast-1::api-id/test/*/my/*'
           ]));
         });
       });
@@ -161,24 +148,24 @@ describe('token', () => {
           assert(statements[0].Effect === 'Allow');
           assert(_.isEqual(statements[0].Resource, [
             'arn:aws:execute-api:ap-northheast-1::api-id/test/*/users',
-            'arn:aws:execute-api:ap-northheast-1::api-id/test/*/users/*',
+            'arn:aws:execute-api:ap-northheast-1::api-id/test/*/users/*'
           ]));
           assert(statements[1].Action === 'execute-api:Invoke');
           assert(statements[1].Effect === 'Allow');
           assert(_.isEqual(statements[1].Resource, [
             'arn:aws:execute-api:ap-northheast-1::api-id/test/*/photos',
-            'arn:aws:execute-api:ap-northheast-1::api-id/test/*/photos/*',
+            'arn:aws:execute-api:ap-northheast-1::api-id/test/*/photos/*'
           ]));
           assert(statements[2].Action === 'execute-api:Invoke');
           assert(statements[2].Effect === 'Allow');
           assert(_.isEqual(statements[2].Resource, [
             'arn:aws:execute-api:ap-northheast-1::api-id/test/*/pests',
-            'arn:aws:execute-api:ap-northheast-1::api-id/test/*/pests/*',
+            'arn:aws:execute-api:ap-northheast-1::api-id/test/*/pests/*'
           ]));
           assert(statements[3].Action === 'execute-api:Invoke');
           assert(statements[3].Effect === 'Allow');
           assert(_.isEqual(statements[3].Resource, [
-            'arn:aws:execute-api:ap-northheast-1::api-id/test/*/my/*',
+            'arn:aws:execute-api:ap-northheast-1::api-id/test/*/my/*'
           ]));
         });
       });
