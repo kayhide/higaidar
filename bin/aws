@@ -3,14 +3,14 @@
 abspath="$(cd "${0%/*}" 2>/dev/null; echo "$PWD")"
 app_name=$(basename "$(dirname "$abspath")")
 
-bin=$(which -a aws | tail -n +2  | head -n 1)
+bin="$(which -a aws | tail -n +2  | head -n 1)"
 
 if [ ! ${bin} ]; then
     echo "command not found: aws"
     exit 1
 fi
 
-subcmd=$1
+subcmd="$1"
 
 if [ $ON_REMOTE ]; then
     profile="${app_name}-${STAGE:-dev}-deploy"
