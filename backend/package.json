@@ -7,7 +7,7 @@
     "jsonwebtoken": "^8.1.0",
     "lodash": "^4.17.4",
     "mime-types": "^2.1.17",
-    "mysql2": "^1.5.1",
+    "mysql2": "^2.1.0",
     "sequelize": "^4.23.2",
     "util.promisify": "^1.0.0"
   },

@@ -5,6 +5,8 @@ const promisify = require('util.promisify');
 const AWS = require('aws-sdk');
 const Sequelize = require('sequelize');
 
+require('tls').DEFAULT_MIN_VERSION = "TLSv1";
+
 
 module.exports.initSequelize = () => {
   const region = process.env.AWS_RDS_REGION;
