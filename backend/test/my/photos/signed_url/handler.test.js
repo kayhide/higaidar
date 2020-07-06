@@ -71,7 +71,7 @@ describe('my/photos/signed_url', () => {
 
           const body = JSON.parse(res.body);
           const url = new URL(body.url);
-          assert(url.host === 'localhost:4572');
+          assert(url.host === `localhost:${process.env.S3_PORT}`);
           assert(url.pathname.match(new RegExp(`^/higaidar-test-photos/${user.id}/.*/image\\.jpg$`)));
 
           assert(url.searchParams.get('AWSAccessKeyId') === '');

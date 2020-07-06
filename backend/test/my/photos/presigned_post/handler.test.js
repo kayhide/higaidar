@@ -70,10 +70,9 @@ describe('my/photos/presigned_post', () => {
           assert(res.statusCode === 200);
 
           const body = JSON.parse(res.body);
-          assert(body.url === 'http://localhost:4572/higaidar-test-photos');
+          assert(body.url === `http://localhost:${process.env.S3_PORT}/higaidar-test-photos`);
 
           const fields = body.fields;
-          console.log(fields);
           assert(_.keys(fields).length === 7);
           assert(fields.key.match(new RegExp(`^${user.id}/.*/image\\.jpg$`)));
           assert(fields.bucket ==='higaidar-test-photos');

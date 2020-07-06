@@ -5,7 +5,8 @@ default: &default
   pool: 5
   username: root
   password:
-  socket: /tmp/mysql.sock
+  host: <%= ENV.fetch("DB_HOST") { "127.0.0.1" } %>
+  port: <%= ENV.fetch("DB_PORT") { "3306" } %>
 
 prod:
   <<: *default

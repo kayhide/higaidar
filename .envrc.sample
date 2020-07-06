@@ -1,0 +1,8 @@
+eval "$(lorri direnv)"
+layout ruby
+PATH_add bin
+
+while read -r f; do
+  watch_file "$f"
+  source_env "$f"
+done < <(find .env -type f)

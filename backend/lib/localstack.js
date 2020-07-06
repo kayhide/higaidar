@@ -19,7 +19,5 @@ function localize(base, origin) {
   };
 }
 
-module.exports.DynamoDB = localize(AWS.DynamoDB, 'localhost:4569');
-module.exports.DynamoDB.DocumentClient = localize(AWS.DynamoDB.DocumentClient, 'localhost:4569');
-module.exports.S3 = localize(AWS.S3, 'localhost:4572');
-module.exports.CloudFormation = localize(AWS.CloudFormation, 'localhost:4581');
+module.exports.S3 = localize(AWS.S3, `localhost:${process.env.S3_PORT}`);
+module.exports.CloudFormation = localize(AWS.CloudFormation, `localhost:${process.env.CLOUDFORMATION_PORT}`);

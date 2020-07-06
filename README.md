@@ -1,3 +1,44 @@
+## Development
+
+Prerequistes:
+- ruby
+- nodejs
+- mysql
+- localstack
+
+### Using nix and direnv
+
+Consume `shell.nix`.
+
+If using `direnv`, copy `.envrc.sample` to `.envrc` and edit so to fit your environment.
+
+
+### Start depending services
+
+Start db and localstack by:
+
+```console
+$ make dev
+```
+
+This starts docker containers in which services are running.
+
+For the first time, you need to initialize database with the following command:
+
+```console
+$ rake db:reset
+$ STAGE=test rake db:reset
+```
+
+Note that the `STAGE` variable specifies which envirionment the operation targets.
+
+### Run backend tests
+
+```console
+$ cd backend
+$ yarn test
+```
+
 ## Deploy for the first
 
 Fill env vars on `.env.{ENV}.yml` copying `.env.test.yml`.

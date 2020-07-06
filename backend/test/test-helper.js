@@ -12,6 +12,7 @@ const promisify = require('util.promisify');
 const stream = require('stream');
 const nock = require('nock');
 const Sequelize = require('sequelize');
+const sinon = require('sinon');
 
 const boot = require('lib/boot');
 const fixture = require('test/fixture');
@@ -20,12 +21,12 @@ const fixture = require('test/fixture');
 function ensureTestVars() {
   const file = path.join(__dirname, '../../.rake/rds/higaidar-test/vars.yml');
   if (fs.existsSync(file)) {
-    return;
+    fs.removeSync(file);
   }
 
   const vars = {
     HOST: 'higaidar.test',
-    PORT: 3306,
+    PORT: process.env.DB_PORT,
     DBI_RESOURCE_ID: 'db-XXXXXXXXXXXXXXXXXXXXXXXXXX',
     USERNAME: 'lambda',
     DATABASE: 'higaidar'

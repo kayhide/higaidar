@@ -223,7 +223,6 @@ describe('my/photos', () => {
       it('returns 204', () => {
         return co(function *() {
           const res = yield handle(event, {});
-          console.log(res);
           assert(res.statusCode === 204);
         });
       });

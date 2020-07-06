@@ -1,0 +1,25 @@
+version: '3.2'
+services:
+  db:
+    image: mysql:5.7
+    volumes:
+      - mysql:/var/lib/mysql
+    environment:
+      MYSQL_ALLOW_EMPTY_PASSWORD: 1
+      BIND-ADDRESS: 0.0.0.0
+    ports:
+      - 3306
+
+  localstack:
+    image: localstack/localstack
+    volumes:
+      - localstack:/tmp/localstack
+    environment:
+      SERVICES: kinesis,s3,cloudformation
+    ports:
+      - 4572 # S3
+      - 4581 # CloudFormation
+
+volumes:
+  mysql:
+  localstack:

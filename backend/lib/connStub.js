@@ -26,7 +26,9 @@ const initSequelize = () => {
     const c = db_config[process.env.STAGE];
     sequelize = new Sequelize(c.database, c.username, c.password, {
       host: 'localhost',
-      dialect: { mysql2: 'mysql' }[c.adapter] || c.adapter
+      port: process.env.DB_PORT || "3306",
+      dialect: { mysql2: 'mysql' }[c.adapter] || c.adapter,
+      logging: false
     })
   }
 
