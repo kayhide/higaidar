@@ -191,6 +191,7 @@ namespace :rds do
   db_info = File.join(dst_dir, 'db_info.json')
   my_cnf = File.join(dst_dir, 'my.cnf')
   vars = File.join(dst_dir, 'vars.yml')
+  invalidater = File.join(dst_dir, 'invalidater')
 
   directory dst_dir
 
@@ -208,12 +209,35 @@ namespace :rds do
          '--publicly-accessible'].join(' ')
   end
 
-  task :pull => [dst_dir, db_info, my_cnf, vars]
+  desc 'Show DB instance info'
+  task :info => [:invalidate, db_info] do
+    puts open(db_info, &:read)
+  end
 
-  file db_info do
+  desc 'Stop DB instance'
+  task :stop => [db_info] do
+    info = JSON.load File.open(db_info)
+    status = info['DBInstances'][0]['DBInstanceStatus']
+    raise "DB instance status is not available but: #{status}" if status != 'available'
+
+    aws ['rds', 'stop-db-instance',
+         '--db-instance-identifier', $database_name].join(' ')
+  end
+
+  task :pull => [:invalidate, dst_dir, db_info, my_cnf, vars]
+
+  task :invalidate do
+    FileUtils.touch invalidater
+  end
+
+  file invalidater do
+    FileUtils.touch invalidater
+  end
+
+  file db_info => [invalidater] do
     with_file db_info, delete_on_fail: true do
-      res = aws ['rds', 'describe-db-instances',
-                 '--db-instance-identifier', $database_name].join(' ')
+      aws ['rds', 'describe-db-instances',
+           '--db-instance-identifier', $database_name].join(' ')
     end
   end
 
