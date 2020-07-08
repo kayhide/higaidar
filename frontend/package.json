@@ -1,7 +1,9 @@
 {
   "private": true,
   "dependencies": {
-    "aws-sdk": "^2.132.0"
+    "aws-sdk": "^2.132.0",
+    "css-loader": "^3.6.0",
+    "style-loader": "^1.2.1"
   },
   "devDependencies": {
     "browser-sync": "^2.18.13",
