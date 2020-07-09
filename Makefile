@@ -5,11 +5,13 @@ COMPOSE_COMMAND := docker-compose
 dev:
 	${COMPOSE_COMMAND} up -d
 	@$(MAKE) --no-print-directory envs
-	@(cd backend && yarn localstack:setup:all)
+	@sleep 5
+	@(source .env/ports && cd backend && yarn localstack:setup:all)
 .PHONY: dev
 
 down:
 	${COMPOSE_COMMAND} down
+	@echo > .env/ports
 .PHONY: down
 
 envs: DB_PORT := $(shell ${COMPOSE_COMMAND} port db 3306 | cut -d ':' -f 2)
