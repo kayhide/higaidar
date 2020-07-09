@@ -4,7 +4,7 @@ const Serverless = require('serverless');
 
 function readConfig() {
   const sls = new Serverless();
-  return sls.service.load().then(() => {
+  return sls.init().then(() => {
     return sls.variables.populateService();
   }).then(() => {
     return Promise.resolve(sls.service);
@@ -30,7 +30,7 @@ module.exports = function() {
   else {
     return readConfig().then(c => {
       config = c;
-      injectEnv(c)
+      injectEnv(c);
       return c;
     });
   }
