@@ -237,6 +237,8 @@ functions:
       - s3:
           bucket: photos
           event: s3:ObjectCreated:*
+    layers:
+      - {Ref: ImagemagickLambdaLayer}
 
 resources:
   Resources:
@@ -283,3 +285,7 @@ resources:
         SourceAccount:
           Ref: AWS::AccountId
         SourceArn: "arn:aws:s3:::${self:provider.environment.RESOURCE_PREFIX}photos"
+
+layers:
+  imagemagick:
+    path: layer/imagemagick
