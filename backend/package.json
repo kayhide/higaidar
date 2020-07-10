@@ -13,6 +13,9 @@
     "uuid": "^8.2.0"
   },
   "devDependencies": {
+    "eslint": "^7.4.0",
+    "eslint-config-airbnb-base": "^14.2.0",
+    "eslint-plugin-import": "^2.22.0",
     "fs-extra": "^4.0.2",
     "intelli-espower-loader": "^1.0.1",
     "js-yaml": "^3.10.0",
@@ -25,6 +28,7 @@
   },
   "scripts": {
     "test": "NODE_PATH=. mocha --recursive --exit --require intelli-espower-loader",
+    "lint": "NODE_PATH=. eslint app --fix",
     "localstack:setup": "NODE_PATH=. node lib/setup.js",
     "localstack:setup:all": "yarn localstack:setup && STAGE=test yarn localstack:setup",
     "repl": "NODE_PATH=. node lib/repl.js",
