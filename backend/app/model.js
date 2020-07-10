@@ -1,9 +1,6 @@
-'use strict';
-
 const _ = require('lodash');
 
 const conn = require('app/model/conn');
-
 
 let sequelize;
 
@@ -21,12 +18,11 @@ module.exports.with = (f) => {
       return conn.initSequelize().then(attempt);
     }
     return Promise.reject(err);
-  }
+  };
 
   return (sequelize ? Promise.resolve(sequelize) : conn.initSequelize())
-    .then(attempt).catch(retry)
+    .then(attempt).catch(retry);
 };
-
 
 const load = (sequelize) => {
   const defs = {
@@ -36,8 +32,8 @@ const load = (sequelize) => {
     Crop: require('app/model/crop'),
   };
 
-  const m = _.mapValues(defs, d => d.define(sequelize));
-  _.mapValues(defs, d => d.relate(m));
+  const m = _.mapValues(defs, (d) => d.define(sequelize));
+  _.mapValues(defs, (d) => d.relate(m));
 
   return m;
 };

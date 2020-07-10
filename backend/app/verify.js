@@ -1,12 +1,10 @@
-'use strict';
-
 class AppResourceNotFoundError extends Error {
   constructor() {
     super('Resource not found');
     this.name = 'AppResourceNotFoundError';
     Error.captureStackTrace(this, this.constructor);
   }
-};
+}
 
 class AppAuthenticationFailed extends Error {
   constructor() {
@@ -14,7 +12,7 @@ class AppAuthenticationFailed extends Error {
     this.name = 'AppAuthenticationFailed';
     Error.captureStackTrace(this, this.constructor);
   }
-};
+}
 
 module.exports.presence = (x) => {
   if (!x) {
