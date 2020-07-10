@@ -26,7 +26,8 @@ const factory = {
   pest: function *() {
     for (let i = 1;; ++i) {
       yield {
-        label: `Pest ${i}`
+        label: `Pest ${i}`,
+        crop: `Crop ${i}`
       }
     };
   },

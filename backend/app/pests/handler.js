@@ -18,8 +18,9 @@ module.exports.index = (event, context, callback) => {
   co(function *() {
     const params = parseParams(event);
     const { offset, limit } = params.pager({ offset: 0, limit: 50 });
+    const where = params.filter('crop');
     const data = yield model.with(m => co(function *() {
-      return m.Pest.findAndCountAll({ order: [['id', 'ASC']], offset, limit });
+      return m.Pest.findAndCountAll({ order: [['id', 'ASC']], offset, limit, where });
     }));
 
     const items = data.rows.map(item => item.dataValues);

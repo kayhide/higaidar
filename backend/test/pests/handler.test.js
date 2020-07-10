@@ -86,6 +86,30 @@ describe('pests', () => {
         });
       });
     });
+
+    context('with filtering params', () => {
+      it('filters by crop', () => {
+        return co(function *() {
+          const crop = "Mikan";
+          const pests = yield factory.createList(Pest, 3, { crop });
+
+          yield factory.createList(Pest, 2);
+
+          event.queryStringParameters = {
+            crop: `eq(${crop})`
+          };
+
+          const res = yield handle(event, {})
+          assert(res.headers['Content-Range'] === '0-2/3');
+
+          const body = JSON.parse(res.body);
+          assert(body.length === 3);
+          assert(helper.isEqualModel(body[0], pests[0]));
+          assert(helper.isEqualModel(body[1], pests[1]));
+          assert(helper.isEqualModel(body[2], pests[2]));
+        });
+      });
+    });
   });
 
   describe('#create', () => {
@@ -95,7 +119,10 @@ describe('pests', () => {
     });
 
     context('with valid attrs', () => {
-      const attrs = {};
+      const attrs = {
+        label: 'New Pest',
+        crop: 'Mikan'
+      };
 
       beforeEach(() => {
         event.body = JSON.stringify(attrs);
