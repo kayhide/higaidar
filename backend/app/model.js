@@ -32,7 +32,8 @@ const load = (sequelize) => {
   const defs = {
     User: require('app/model/user'),
     Photo: require('app/model/photo'),
-    Pest: require('app/model/pest')
+    Pest: require('app/model/pest'),
+    Crop: require('app/model/crop'),
   };
 
   const m = _.mapValues(defs, d => d.define(sequelize));

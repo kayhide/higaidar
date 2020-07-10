@@ -29,7 +29,14 @@ const factory = {
         label: `Pest ${i}`
       }
     };
-  }
+  },
+  crop: function *() {
+    for (let i = 1;; ++i) {
+      yield {
+        label: `Crop ${i}`
+      }
+    };
+  },
 };
 
 const cur = _.mapValues(factory, f => f());
