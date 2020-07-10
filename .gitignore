@@ -79,19 +79,6 @@ typings/
 .env
 
 
-### https://raw.github.com/github/gitignore/c0c1a480a906df0e023f3250cf2ad82f1612be67/purescript.gitignore
-
-# Dependencies
-.psci_modules
-bower_components
-node_modules
-
-# Generated files
-.psci
-output
-
-
-
 ### https://raw.github.com/github/gitignore/c0c1a480a906df0e023f3250cf2ad82f1612be67/Global/macos.gitignore
 
 *.DS_Store

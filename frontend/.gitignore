@@ -1,0 +1,13 @@
+### https://raw.github.com/github/gitignore/36ce3a894d9ddff2916bc98d71380aa7167ff1d7/PureScript.gitignore
+
+# Dependencies
+.psci_modules
+.spago
+bower_components
+node_modules
+
+# Generated files
+.psci
+output
+
+

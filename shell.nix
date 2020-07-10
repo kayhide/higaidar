@@ -10,6 +10,7 @@ pkgs.mkShell {
     nodejs
     yarn
     purescript
+    spago
     pscid
     pulp
 
