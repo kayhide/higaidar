@@ -24,8 +24,7 @@
     "sinon": "^4.1.2"
   },
   "scripts": {
-    "test": "NODE_PATH=. mocha --recursive --require intelli-espower-loader",
-    "test:watch": "NODE_PATH=. mocha --recursive --watch --require intelli-espower-loader",
+    "test": "NODE_PATH=. mocha --recursive --exit --require intelli-espower-loader",
     "localstack:setup": "NODE_PATH=. node lib/setup.js",
     "localstack:setup:all": "yarn localstack:setup && STAGE=test yarn localstack:setup",
     "repl": "NODE_PATH=. node lib/repl.js",
