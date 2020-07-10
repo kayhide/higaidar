@@ -9,6 +9,9 @@ pkgs.mkShell {
 
     nodejs
     yarn
+    purescript
+    pscid
+    pulp
 
     mysql
     libmysqlclient
