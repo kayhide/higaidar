@@ -1,19 +1,17 @@
 module Component.General.HomePage where
 
-import Prelude
+import AppPrelude
 
+import Affjax (URL)
 import Api as Api
 import Api.My.Photos as Photos
 import Api.Pests as Pests
 import Component.HTML.LoadingIndicator as LoadingIndicator
 import Component.UploadUI as UploadUI
 import Component.Util as Util
-import Control.Monad.Aff (Aff, Milliseconds(..), attempt, delay)
+import Control.Monad.State (class MonadState)
 import Data.Array as Array
-import Data.DateTime.Locale (Locale)
-import Data.Either (Either(Left, Right))
-import Data.Lens (view, (.~))
-import Data.Maybe (Maybe(Just, Nothing), isJust, isNothing, maybe)
+import Data.Lens (view)
 import Data.String as String
 import Halogen as H
 import Halogen.HTML as HH
@@ -21,24 +19,19 @@ import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Query.HalogenM as HM
 import I18n.Ja as Ja
-import Model.Pest (Pest(..))
-import Model.Photo (Photo(..), PhotoId, _original_url, _pest, _thumbnail_url)
+import Model.DateTime (Locale)
+import Model.Pest (Pest (..))
+import Model.Photo (Photo (..), PhotoId, _original_url, _pest, _thumbnail_url)
 import Model.Photo as Photo
-import Network.HTTP.Affjax (AJAX, URL)
 
 
-data Slot = Slot
-derive instance eqSlot :: Eq Slot
-derive instance ordSlot :: Ord Slot
-
-
-data Query a
-  = Initialize a
-  | Reload a
-  | SetPest Photo String a
-  | Destroy PhotoId a
-  | ToggleDeleting a
-  | HandleUpload UploadUI.Message a
+data Action
+  = Initialize
+  | Reload
+  | SetPest Photo String
+  | Destroy PhotoId
+  | ToggleDeleting
+  | HandleUpload UploadUI.Message
 
 type State =
   { items :: Array Photo
@@ -58,21 +51,24 @@ type Input =
 data Message
   = Failed String
 
-type ChildQuery = UploadUI.Query
-type ChildSlot = UploadUI.Slot
+type ChildSlots =
+  ( upload :: H.Slot (Const Void) UploadUI.Message Unit
+  )
 
-type Eff_ eff = Aff (ajax :: AJAX | eff)
 
-ui :: forall eff. H.Component HH.HTML Query Input Message (Eff_ eff)
+ui ::
+  forall m.
+  MonadAff m =>
+  H.Component HH.HTML (Const Void) Input Message m
 ui =
-  H.lifecycleParentComponent
-    { initialState
-    , render
-    , eval
-    , receiver: const Nothing
-    , initializer: Just $ H.action Initialize
-    , finalizer: Nothing
+  H.mkComponent
+  { initialState
+  , render
+  , eval: H.mkEval $ H.defaultEval
+    { handleAction = handleAction
+    , initialize = Just Initialize
     }
+  }
   where
     initialState { client, locale } =
       { items: []
@@ -84,7 +80,10 @@ ui =
       , busy: false
       }
 
-render :: forall eff. State -> H.ParentHTML Query ChildQuery ChildSlot (Eff_ eff)
+render ::
+  forall m.
+  MonadAff m =>
+  State -> H.ComponentHTML Action ChildSlots m
 render state =
   HH.div_
   [
@@ -109,7 +108,7 @@ render state =
       [
         HH.button
         [ HP.class_ $ H.ClassName $ "btn rounded-circle " <> if deleting then "btn-danger" else "btn-outline-danger"
-        , HE.onClick $ HE.input_ $ ToggleDeleting
+        , HE.onClick $ const $ Just $ ToggleDeleting
         ]
         [ HH.i [ HP.class_ $ H.ClassName "fa fa-trash" ] []
         ]
@@ -124,7 +123,7 @@ render state =
           HH.div
           [ HP.class_ $ H.ClassName "card-body text-center" ]
           [
-            HH.slot UploadUI.Slot UploadUI.ui { client } $ HE.input HandleUpload
+            HH.slot (SProxy :: _ "upload") unit UploadUI.ui { client } $ Just <<< HandleUpload
           ]
         ]
       ]
@@ -174,7 +173,7 @@ render state =
         [
           HH.button
           [ HP.class_ $ H.ClassName "btn btn-danger rounded-circle"
-          , HE.onClick $ HE.input_ $ Destroy id
+          , HE.onClick $ const $ Just $ Destroy id
           ]
           [ HH.i [ HP.class_ $ H.ClassName "fa fa-times" ] []
           ]
@@ -184,7 +183,7 @@ render state =
     renderPest photo@(Photo { pest }) =
       HH.select
       [ HP.class_ $ H.ClassName "form-control"
-      , HE.onValueChange $ HE.input $ SetPest photo
+      , HE.onValueChange $ Just <<< SetPest photo
       ]
       $ [ renderDefaultPestOption pest ]
       <> (renderPestOption pest <$> state.pests)
@@ -203,27 +202,28 @@ render state =
       ]
       [ HH.text label ]
 
-eval :: forall eff. Query ~> H.ParentDSL State Query ChildQuery ChildSlot Message (Eff_ eff)
-eval = case _ of
-  Initialize next -> do
+handleAction ::
+  forall m.
+  MonadAff m =>
+  Action -> H.HalogenM State Action ChildSlots Message m Unit
+handleAction = case _ of
+  Initialize -> do
     void $ HM.fork loadPests
     void $ HM.fork runPoller
-    eval $ Reload next
+    handleAction $ Reload
 
-  Reload next -> do
+  Reload -> do
     Util.whenNotBusy_ do
       cli <- H.gets _.client
       photos <- H.liftAff $ attempt $ Photos.index cli
 
       case photos of
         Right photos_ ->
-          H.modify _{ items = photos_ }
+          H.modify_ _{ items = photos_ }
         Left _ ->
           H.raise $ Failed "Failed to access api."
 
-    pure next
-
-  SetPest photo label next -> do
+  SetPest photo label -> do
     Util.whenNotBusy_ do
       cli <- H.gets _.client
       let pest = if String.null label then Nothing else Just label
@@ -235,9 +235,7 @@ eval = case _ of
         Left _ -> do
           H.raise $ Failed "Failed to update photo."
 
-    pure next
-
-  Destroy photoId next -> do
+  Destroy photoId -> do
     Util.whenNotBusy_ do
       cli <- H.gets _.client
       res <- H.liftAff $ attempt $ Photos.destroy cli photoId
@@ -245,40 +243,35 @@ eval = case _ of
       case res of
         Right _ -> do
           items <- Array.filter ((photoId /= _) <<< view Photo._id) <$> H.gets _.items
-          H.modify _{ items = items }
+          H.modify_ _{ items = items }
         Left _ ->
           H.raise $ Failed "Failed to destroy photo."
 
-    pure next
-
-  ToggleDeleting next -> do
+  ToggleDeleting -> do
     deleting <- not <$> H.gets _.deleting
-    H.modify _{ deleting = deleting }
-    pure next
+    H.modify_ _{ deleting = deleting }
 
-  HandleUpload (UploadUI.Uploaded url) next -> do
+  HandleUpload (UploadUI.Uploaded url) -> do
     loadingItems <- Array.cons url <$> H.gets _.loadingItems
-    H.modify _{ loadingItems = loadingItems }
-    pure next
+    H.modify_ _{ loadingItems = loadingItems }
 
-  HandleUpload (UploadUI.Failed s) next -> do
+  HandleUpload (UploadUI.Failed s) -> do
     H.raise $ Failed s
-    pure next
 
-loadPests :: forall eff. H.ParentDSL State Query ChildQuery ChildSlot Message (Eff_ eff) Unit
+loadPests :: forall m. MonadAff m => H.HalogenM State Action ChildSlots Message m Unit
 loadPests = do
   cli <- H.gets _.client
   res <- H.liftAff $ attempt $ Pests.index cli
 
   case res of
     Right pests -> do
-      H.modify _{ pests = pests }
+      H.modify_ _{ pests = pests }
     Left _ -> do
       H.raise $ Failed "Failed to load Pests. Retrying..."
       H.liftAff $ delay (Milliseconds 5000.0)
       loadPests
 
-runPoller :: forall eff. H.ParentDSL State Query ChildQuery ChildSlot Message (Eff_ eff) Unit
+runPoller :: forall m. MonadAff m => MonadState State m => m Unit
 runPoller = do
   H.liftAff $ delay (Milliseconds 1000.0)
   loadingItems <- H.gets _.loadingItems
@@ -296,7 +289,7 @@ runPoller = do
               loadingItems_ = Array.difference loadingItems $ view _original_url <$> photos__
 
           items <- append photos__ <$> H.gets _.items
-          H.modify _{ items = items, loadingItems = loadingItems_ }
+          H.modify_ _{ items = items, loadingItems = loadingItems_ }
         Left _ ->
           pure unit
   runPoller

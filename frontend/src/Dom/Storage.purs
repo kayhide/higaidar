@@ -1,36 +1,30 @@
 module Dom.Storage where
 
-import Prelude
+import AppPrelude
 
-import Control.Monad.Aff (Aff, attempt, throwError)
-import Control.Monad.Eff (Eff, kind Effect)
-import Control.Monad.Eff.Class (liftEff)
-import Control.Monad.Eff.Exception (EXCEPTION, error, try)
-import Control.Monad.Except (runExcept)
-import Data.Either (Either(..), either)
-import Data.Foreign (Foreign)
-import Data.Foreign.Class (class Decode, class Encode, decode, encode)
-import Data.Maybe (Maybe(..))
+import Control.Monad.Error.Class (throwError, try)
+import Data.Argonaut (class DecodeJson, class EncodeJson, Json, decodeJson, encodeJson)
+import Effect.Exception (error)
 
-foreign import data STORAGE :: Effect
 
-foreign import _get :: forall eff. String -> Eff (exception :: EXCEPTION | eff) Foreign
-foreign import _set :: forall eff. String -> Foreign -> Eff (exception :: EXCEPTION | eff) Unit
+foreign import _get :: String -> Effect Json
+foreign import _set :: String -> Json -> Effect Unit
 
-get :: forall eff a. Decode a => String -> Aff (storage :: STORAGE | eff) a
-get key = do
-  val <- liftEff $ try $ _get key
+get :: forall a m. MonadEffect m => DecodeJson a => String -> m a
+get key = liftEffect do
+  val <- try $ _get key
   case val of
     Right val_ -> do
-      either (throwError <<< error <<< show) pure $ runExcept $ decode val_
+      either (throwError <<< error <<< show) pure $ decodeJson val_
     Left _ -> throwError $ error $ "Value not found: " <> key
 
-getMay :: forall eff a. Decode a => String -> Aff (storage :: STORAGE | eff) (Maybe a)
+getMay :: forall a m. MonadEffect m => DecodeJson a => String -> m (Maybe a)
 getMay key =
-  either (const Nothing) Just <$> (attempt $ get key)
+  liftEffect
+  $ either (const Nothing) Just <$> (try $ get key)
 
 
-set :: forall eff a. Encode a => String -> a -> Aff (storage :: STORAGE | eff) Unit
-set key val = do
-  res <- liftEff $ try $ _set key $ encode val
+set :: forall a m. MonadEffect m => EncodeJson a => String -> a -> m Unit
+set key val = liftEffect do
+  res <- try $ _set key $ encodeJson val
   either (throwError <<< error <<< show) (const $ pure unit) res

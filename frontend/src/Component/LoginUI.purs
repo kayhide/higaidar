@@ -1,32 +1,21 @@
 module Component.LoginUI where
 
-import Prelude
+import AppPrelude
 
 import Api as Api
 import Api.Token as Token
 import Component.HTML.LoadingIndicator as LoadingIndicator
 import Component.HTML.TextField as TextField
 import Component.Util as Util
-import Control.Monad.Aff (Aff, attempt)
 import Control.Monad.Except (runExceptT)
-import Data.Either (Either(Left, Right))
 import Data.Lens (Lens', assign, view)
 import Data.Lens.Record (prop)
-import Data.Maybe (Maybe(Nothing, Just))
-import Data.Symbol (SProxy(..))
-import Dom.Storage (STORAGE)
 import Dom.Storage as Storage
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import I18n.Ja as Ja
-import Network.HTTP.Affjax (AJAX)
-
-
-data Slot = Slot
-derive instance eqSlot :: Eq Slot
-derive instance ordSlot :: Ord Slot
 
 
 type State =
@@ -39,13 +28,13 @@ type State =
 _form :: Lens' State Api.AuthenticateForm
 _form = prop (SProxy :: SProxy "form")
 
-data Query a
-  = Initialize a
-  | Authenticate a
-  | Unauthenticate a
-  | SetString (Lens' Api.AuthenticateForm String) String a
-  | SetCode String a
-  | SetTel String a
+data Action
+  = Initialize
+  | Authenticate
+  | Unauthenticate
+  | SetString (Lens' Api.AuthenticateForm String) String
+  | SetCode String
+  | SetTel String
 
 type Input = Api.Client
 
@@ -55,18 +44,19 @@ data Message
   | Failed Api.Client Api.AuthenticateForm String
 
 
-type Eff_ eff = Aff (ajax :: AJAX, storage :: STORAGE | eff)
-
-ui :: forall eff. H.Component HH.HTML Query Input Message (Eff_ eff)
+ui ::
+  forall m.
+  MonadAff m =>
+  H.Component HH.HTML (Const Void) Input Message m
 ui =
-  H.lifecycleComponent
-    { initialState
-    , render
-    , eval
-    , receiver: const Nothing
-    , initializer: Just $ H.action Initialize
-    , finalizer: Nothing
+  H.mkComponent
+  { initialState
+  , render
+  , eval: H.mkEval $ H.defaultEval
+    { handleAction = handleAction
+    , initialize = Just Initialize
     }
+  }
   where
     initialState client =
       { client
@@ -75,7 +65,10 @@ ui =
       , busy: false
       }
 
-render :: State -> H.ComponentHTML Query
+render ::
+  forall m.
+  MonadAff m =>
+  State -> H.ComponentHTML Action () m
 render state@({ form: Api.AuthenticateForm { code, tel } }) =
   HH.div_
   [
@@ -97,55 +90,55 @@ render state@({ form: Api.AuthenticateForm { code, tel } }) =
       , HH.hr_
       , HH.div
         [ HP.class_ $ H.ClassName "d-flex mt-2" ]
-        [
-          renderLoginButton
+        [ renderLoginButton
         , renderLogoutButton
         ]
       ]
 
-    renderInput :: String -> String -> Lens' Api.AuthenticateForm String -> H.ComponentHTML Query
+    renderInput :: String -> String -> Lens' Api.AuthenticateForm String -> _
     renderInput key label attr =
       TextField.render key label (view attr state.form) $ SetString attr
 
-    renderInputWithHelp :: String -> String -> String -> Lens' Api.AuthenticateForm String -> H.ComponentHTML Query
+    renderInputWithHelp :: String -> String -> String -> Lens' Api.AuthenticateForm String -> _
     renderInputWithHelp key label help attr =
       TextField.renderWithHelp key label (view attr state.form) help $ SetString attr
 
     renderLoginButton =
       HH.button
       [ HP.class_ $ H.ClassName $ "btn btn-outline-secondary" <> if isAuthenticated then " disabled" else ""
-      , HE.onClick $ HE.input_ Authenticate
+      , HE.onClick $ const $ Just Authenticate
       ]
-      [
-        HH.i [ HP.class_ $ H.ClassName "fa fa-sign-in fa-fw mr-1" ] []
+      [ HH.i [ HP.class_ $ H.ClassName "fa fa-sign-in fa-fw mr-1" ] []
       , HH.text Ja.login
       ]
 
     renderLogoutButton =
       HH.button
       [ HP.class_ $ H.ClassName $ "ml-auto btn btn-secondary" <> if isAuthenticated then "" else " disabled"
-      , HE.onClick $ HE.input_ Unauthenticate
+      , HE.onClick $ const $ Just Unauthenticate
       ]
-      [
-        HH.i [ HP.class_ $ H.ClassName "fa fa-sign-out fa-fw mr-1" ] []
+      [ HH.i [ HP.class_ $ H.ClassName "fa fa-sign-out fa-fw mr-1" ] []
       , HH.text Ja.logout
       ]
 
-eval :: forall eff. Query ~> H.ComponentDSL State Query Message (Eff_ eff)
-eval = case _ of
-  Initialize next -> do
+handleAction ::
+  forall m.
+  MonadAff m =>
+  Action -> H.HalogenM State Action () Message m Unit
+handleAction = case _ of
+  Initialize -> do
     form <- H.liftAff $ attempt loadForm
     case form of
       Right form_ -> do
-        H.modify _{ form = form_ }
+        H.modify_ _{ form = form_ }
         isAuthenticated <- Api.isAuthenticated <$> H.gets _.client
         case isAuthenticated of
-          true -> pure next
-          false -> eval $ Authenticate next
+          true -> pure unit
+          false -> handleAction $ Authenticate
       Left s ->
-        pure next
+        pure unit
 
-  Authenticate next -> do
+  Authenticate -> do
     Util.whenNotBusy_ do
       Api.Client { endpoint } <- H.gets _.client
       form <- H.gets _.form
@@ -157,46 +150,39 @@ eval = case _ of
 
       case res of
         Right cli_ -> do
-          H.modify _{ client = cli_ }
+          H.modify_ _{ client = cli_ }
           H.liftAff $ saveForm form
           H.raise $ Authenticated cli_
 
         Left s -> do
-          H.modify _{ client = cli }
+          H.modify_ _{ client = cli }
           H.raise $ Failed cli form s
 
-    pure next
-
-  Unauthenticate next -> do
+  Unauthenticate -> do
     Api.Client { endpoint } <- H.gets _.client
     let cli = Api.makeClient endpoint
-    H.modify _{ client = cli }
+    H.modify_ _{ client = cli }
     H.raise $ Unauthenticated $ cli
 
-    pure next
-
-  SetString attr v next -> do
+  SetString attr v -> do
     assign (_form <<< attr) v
-    pure next
 
-  SetCode code next -> do
+  SetCode code -> do
     Api.AuthenticateForm form <- H.gets _.form
-    H.modify $ _{ form = Api.AuthenticateForm $ form { code = code } }
-    pure next
+    H.modify_ $ _{ form = Api.AuthenticateForm $ form { code = code } }
 
-  SetTel tel next -> do
+  SetTel tel -> do
     Api.AuthenticateForm form <- H.gets _.form
-    H.modify $ _{ form = Api.AuthenticateForm $ form { tel = tel } }
-    pure next
+    H.modify_ $ _{ form = Api.AuthenticateForm $ form { tel = tel } }
 
 
-loadForm :: forall eff. Aff (storage :: STORAGE | eff) Api.AuthenticateForm
+loadForm :: Aff Api.AuthenticateForm
 loadForm = do
   code <- Storage.get "user.code"
   tel <- Storage.get "user.tel"
   pure $ Api.AuthenticateForm { code, tel }
 
-saveForm :: forall eff. Api.AuthenticateForm -> Aff (storage :: STORAGE | eff) Unit
+saveForm :: Api.AuthenticateForm -> Aff Unit
 saveForm (Api.AuthenticateForm { code, tel }) = do
   Storage.set "user.code" code
   Storage.set "user.tel" tel

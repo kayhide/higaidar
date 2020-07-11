@@ -1,15 +1,14 @@
 module Component.HTML.TextField where
 
-import Prelude
+import AppPrelude
 
-import Halogen (Action)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 
-render :: forall q p. String -> String -> String -> (String -> Action q) -> HH.HTML p (q Unit)
-render key label value query =
+render :: forall props act. String -> String -> String -> (String -> act) -> HH.HTML props act
+render key label value handle =
   HH.div
   [ HP.class_ $ H.ClassName "form-group" ]
   [
@@ -20,12 +19,12 @@ render key label value query =
     [ HP.class_ $ H.ClassName "form-control mr-2"
     , HP.id_ key
     , HP.value value
-    , HE.onValueInput $ HE.input query
+    , HE.onValueInput $ Just <<< handle
     ]
   ]
 
-renderWithHelp :: forall q p. String -> String -> String -> String -> (String -> Action q) -> HH.HTML p (q Unit)
-renderWithHelp key label value help query =
+renderWithHelp :: forall props act. String -> String -> String -> String -> (String -> act) -> HH.HTML props act
+renderWithHelp key label value help handle =
   HH.div
   [ HP.class_ $ H.ClassName "form-group" ]
   [
@@ -36,7 +35,7 @@ renderWithHelp key label value help query =
     [ HP.class_ $ H.ClassName "form-control mr-2"
     , HP.id_ key
     , HP.value value
-    , HE.onValueInput $ HE.input query
+    , HE.onValueInput $ Just <<< handle
     ]
   , HH.small
     [ HP.class_ $ H.ClassName "form-text text-muted" ]

@@ -1,50 +1,48 @@
 module Api where
 
-import Prelude
+import AppPrelude
 
-import Control.Monad.Aff (Aff, error, throwError)
-import Control.Monad.Except (runExcept)
+import Affjax (Request, Response, defaultRequest, request)
+import Affjax as Affjax
+import Affjax.RequestBody as RequestBody
+import Affjax.RequestHeader (RequestHeader(..))
+import Affjax.ResponseFormat as RequestFormat
+import Affjax.ResponseHeader as ResponseHeader
+import Data.Argonaut (class DecodeJson, class EncodeJson, Json, decodeJson, encodeJson)
 import Data.Array as Array
-import Data.Either (Either(..), either)
-import Data.Foreign.Class (class Decode, class Encode)
-import Data.Foreign.Generic (decodeJSON, defaultOptions, encodeJSON, genericDecode, genericEncode)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.HTTP.Method (Method(..))
-import Data.Lens (Lens', lens, (^.))
+import Data.Lens (Lens', lens)
+import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
-import Data.Maybe (Maybe(..), maybe)
-import Data.Newtype (class Newtype, unwrap, wrap)
-import Data.StrMap (StrMap)
-import Data.StrMap as StrMap
-import Data.String as String
-import Data.Symbol (SProxy(..))
+import Effect.Aff (error, throwError)
+import Foreign.Object (Object)
+import Foreign.Object as Object
 import Global (encodeURI)
 import Model.User (User)
-import Network.HTTP.Affjax (AJAX, AffjaxRequest, AffjaxResponse, URL)
-import Network.HTTP.Affjax as Affjax
-import Network.HTTP.RequestHeader (RequestHeader(..))
-import Network.HTTP.ResponseHeader (responseHeaderName, responseHeaderValue)
-import Text.Parsing.Simple (parse)
-import Text.Parsing.Simple as P
+import Text.Parsing.Parser (runParser)
+import Text.Parsing.Parser.Language as ParserLanguage
+import Text.Parsing.Parser.String as P
+import Text.Parsing.Parser.Token (makeTokenParser)
 
 
 newtype Client
   = Client
-    { endpoint :: URL
+    { endpoint :: String
     , user :: Maybe User
     , token :: Maybe AuthenticationToken
     }
 
-makeClient :: URL -> Client
+makeClient :: String -> Client
 makeClient endpoint = Client { endpoint, user: Nothing, token: Nothing }
 
-derive instance genericClient :: Generic Client _
 derive instance newtypeClient :: Newtype Client _
+derive instance genericClient :: Generic Client _
 instance showClient :: Show Client where
   show = genericShow
 
-_endpoint :: Lens' Client URL
+_endpoint :: Lens' Client String
 _endpoint = lens (_.endpoint <<< unwrap) (\s a -> wrap $ _{ endpoint = a } $ unwrap s)
 
 _user :: Lens' Client (Maybe User)
@@ -58,26 +56,23 @@ type UserCode = String
 type UserTel = String
 type AuthenticationToken = String
 
-type AuthenticateFormRec
-  = { code :: UserCode
-    , tel :: UserTel
-    }
-newtype AuthenticateForm = AuthenticateForm AuthenticateFormRec
-
-_AuthenticateForm :: Lens' AuthenticateForm AuthenticateFormRec
-_AuthenticateForm = lens (\(AuthenticateForm r) -> r) (\_ r -> AuthenticateForm r)
+newtype AuthenticateForm =
+  AuthenticateForm
+  { code :: UserCode
+  , tel :: UserTel
+  }
 
 _code :: Lens' AuthenticateForm UserCode
-_code = _AuthenticateForm <<< prop (SProxy :: SProxy "code")
+_code = _Newtype <<< prop (SProxy :: SProxy "code")
 
 _tel :: Lens' AuthenticateForm UserTel
-_tel = _AuthenticateForm <<< prop (SProxy :: SProxy "tel")
+_tel = _Newtype <<< prop (SProxy :: SProxy "tel")
 
+derive instance newtypeAuthenticateForm :: Newtype AuthenticateForm _
 derive instance genericAuthenticateForm :: Generic AuthenticateForm _
 instance showAuthenticateForm :: Show AuthenticateForm where
   show = genericShow
-instance encodeAuthenticateForm :: Encode AuthenticateForm where
-  encode = genericEncode $ defaultOptions { unwrapSingleConstructors = true }
+derive newtype instance encodeJsonAuthenticateForm :: EncodeJson AuthenticateForm
 
 
 isAuthenticated :: Client -> Boolean
@@ -97,54 +92,58 @@ type WithRange a =
   , range :: Range
   }
 
-get :: forall eff a. Decode a => Client -> String -> Aff (ajax :: AJAX | eff) a
+get :: forall a. DecodeJson a => Client -> String -> Aff a
 get cli path
-  = buildGet cli path >>= Affjax.affjax >>= handle
+  = buildGet cli path >>= request >>= handleRequestError >>= handle
 
-getWithRange :: forall eff a. Decode a => Client -> String -> Aff (ajax :: AJAX | eff) (WithRange a)
+getWithRange :: forall a. DecodeJson a => Client -> String -> Aff (WithRange a)
 getWithRange cli path = do
-  res <- buildGet cli path >>= Affjax.affjax
+  res <- buildGet cli path >>= request >>= handleRequestError
   body <- handle res
   range <- pickContentRange res
   pure { body, range }
 
 
-post :: forall eff a b. Encode a => Decode b => Client -> String -> a -> Aff (ajax :: AJAX | eff) b
+post :: forall a b. EncodeJson a => DecodeJson b => Client -> String -> a -> Aff b
 post cli path x
-  = buildPost cli path x >>= Affjax.affjax >>= handle
+  = buildPost cli path x >>= request >>= handleRequestError >>= handle
 
-patch :: forall eff a b. Encode a => Decode b => Client -> String -> a -> Aff (ajax :: AJAX | eff) b
+patch :: forall a b. EncodeJson a => DecodeJson b => Client -> String -> a -> Aff b
 patch cli path x
-  = buildPatch cli path x >>= Affjax.affjax >>= handle
+  = buildPatch cli path x >>= request >>= handleRequestError >>= handle
 
-delete :: forall eff. Client -> String -> Aff (ajax :: AJAX | eff) Unit
+delete :: Client -> String -> Aff Unit
 delete cli path
-  = buildDelete cli path >>= Affjax.affjax >>= handle_
+  = void $ buildDelete cli path >>= request >>= handleRequestError >>= const (pure unit)
 
 
-verifyToken :: forall eff. Client -> Aff eff AuthenticationToken
+verifyToken :: Client -> Aff AuthenticationToken
 verifyToken (Client cli) = maybe throw_ pure cli.token
   where
     throw_ = throwError $ error "Token is not ready."
 
-buildGet :: forall eff. Client -> String -> Aff eff (AffjaxRequest Unit)
+buildGet :: Client -> String -> Aff (Request Json)
 buildGet cli path = do
   token <- verifyToken cli
   let url = cli ^. _endpoint <> path
       headers = [ RequestHeader "Authorization" $ "Bearer " <> token ]
-  pure $ Affjax.defaultRequest { url = url, headers = headers }
+  pure $ defaultRequest
+    { url = url
+    , headers = headers
+    , responseFormat = RequestFormat.json
+    }
 
-buildPost :: forall eff a. Encode a => Client -> String -> a -> Aff eff (AffjaxRequest String)
+buildPost :: forall a. EncodeJson a => Client -> String -> a -> Aff (Request Json)
 buildPost cli path x = do
   req <- buildGet cli path
-  pure $ req { method = Left POST, content = Just $ encodeJSON x }
+  pure $ req { method = Left POST, content = Just $ RequestBody.json $ encodeJson x }
 
-buildPatch :: forall eff a. Encode a => Client -> String -> a -> Aff eff (AffjaxRequest String)
+buildPatch :: forall a. EncodeJson a => Client -> String -> a -> Aff (Request Json)
 buildPatch cli path x = do
   req <- buildPost cli path x
   pure $ req { method = Left PATCH }
 
-buildDelete :: forall eff. Client -> String -> Aff eff (AffjaxRequest Unit)
+buildDelete :: Client -> String -> Aff (Request Json)
 buildDelete cli path = do
   req <- buildGet cli path
   pure $ req { method = Left DELETE }
@@ -155,55 +154,58 @@ newtype ResponseNg
     { message :: String
     }
 derive instance genericErrorResponse :: Generic ResponseNg _
-instance decodeErrorResponse :: Decode ResponseNg where
-  decode = genericDecode $ defaultOptions { unwrapSingleConstructors = true }
+derive instance newtypeErrorResponse :: Newtype ResponseNg _
+derive newtype instance decodeErrorResponse :: DecodeJson ResponseNg
 
 
-handle :: forall eff a. Decode a => AffjaxResponse String -> Aff eff a
-handle res = do
-  case (runExcept $ decodeJSON res.response) of
-    Right x -> pure x
-    Left _ -> handleError res.response
+handleRequestError ::
+  forall a.
+  Either Affjax.Error (Response a) -> Aff (Response a)
+handleRequestError =
+  either (throwError <<< error <<< Affjax.printError) pure
 
-handle_ :: forall eff. AffjaxResponse String -> Aff eff Unit
-handle_ res = do
-  case String.null res.response of
-    true -> pure unit
-    false -> handleError res.response
+handle ::
+  forall a.
+  DecodeJson a =>
+  Response Json -> Aff a
+handle res = case decodeJson res.body of
+  Right x -> pure x
+  Left _ -> handleError res.body
 
-handleError :: forall eff a. String -> Aff eff a
+handleError :: forall a. Json -> Aff a
 handleError body =
-  case (runExcept $ decodeJSON body) of
+  case decodeJson body of
     Right (ResponseNg ng) -> throwError $ error ng.message
-    Left err -> throwError <<< error $ body <> show err
+    Left err -> throwError $ error err
 
-pickContentRange :: forall eff. AffjaxResponse String -> Aff eff Range
+pickContentRange :: Response Json -> Aff Range
 pickContentRange res = do
   contentRange <-
-    maybe (throwError $ error "Content-Range not present") (pure <<< responseHeaderValue)
-    $ Array.find (eq "content-range" <<< responseHeaderName) res.headers
+    maybe (throwError $ error "Content-Range not present") (pure <<< ResponseHeader.value)
+    $ Array.find (eq "content-range" <<< ResponseHeader.name) res.headers
   range <-
     either (const $ throwError $ error "Content-Range mal-formatted") pure
-    $ parse parser contentRange
+    $ runParser contentRange parser
   pure range
   where
+    tokenParser = makeTokenParser ParserLanguage.haskellDef
     parser = do
-      first <- P.int
+      first <- tokenParser.integer
       void $ P.char '-'
-      last <- P.int
+      last <- tokenParser.integer
       void $ P.char '/'
-      count <- P.int
+      count <- tokenParser.integer
       pure { first, last, count }
 
 
 
 data Filtering = Eq_ String | In_ (Array String)
 
-type FilteringMap = StrMap Filtering
+type FilteringMap = Object Filtering
 
 querify :: Filtering -> String
-querify (Eq_ x) = "eq(" <> (encodeURI x) <> ")"
-querify (In_ xs) = "in(" <> (Array.intercalate "," $ map encodeURI xs) <> ")"
+querify (Eq_ x) = "eq(" <> (fromMaybe "" $ encodeURI x) <> ")"
+querify (In_ xs) = "in(" <> (Array.intercalate "," $ fromMaybe "" <<< encodeURI <$> xs) <> ")"
 
 buildQuery :: FilteringMap -> String
-buildQuery = Array.intercalate "&" <<< StrMap.mapWithKey (\k v -> encodeURI k <> "=" <> querify v)
+buildQuery = Array.intercalate "&" <<< Object.mapWithKey (\k v -> (fromMaybe "" $ encodeURI k) <> "=" <> querify v)

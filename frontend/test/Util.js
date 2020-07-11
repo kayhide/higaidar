@@ -1,6 +1,6 @@
 'strict';
 
-const helper = require('lib/helper');
+const helper = require('lib/helper.js');
 
 const stage = process.env.STAGE || 'dev';
 const vars = helper.readPublicEnv(stage);

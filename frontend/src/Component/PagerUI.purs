@@ -1,21 +1,12 @@
 module Component.PagerUI where
 
-import Prelude
+import AppPrelude
 
 import Data.Array as Array
-import Data.Lens (Lens)
-import Data.Lens.Record (prop)
-import Data.Maybe (Maybe(Nothing))
-import Data.Symbol (SProxy(..))
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
-
-
-data Slot = Slot
-derive instance eqSlot :: Eq Slot
-derive instance ordSlot :: Ord Slot
 
 
 type Pager
@@ -23,15 +14,6 @@ type Pager
     , per :: Int
     , count :: Int
     }
-
-_current :: forall a b r. Lens { current :: a | r } { current :: b | r } a b
-_current = prop (SProxy :: SProxy "current")
-
-_per :: forall a b r. Lens { per :: a | r } { per :: b | r } a b
-_per = prop (SProxy :: SProxy "per")
-
-_count :: forall a b r. Lens { count :: a | r } { count :: b | r } a b
-_count = prop (SProxy :: SProxy "count")
 
 
 type Config
@@ -63,37 +45,48 @@ type State =
   , pager :: Pager
   }
 
-data Query a
-  = Select Int a
-  | SetPager Pager a
+data Action
+  = Select Int
+
 
 type Input = Pager
+
+
+data Query a
+  = SetPager Pager a
 
 data Message
   = Selected Int
 
 
-ui :: forall eff. H.Component HH.HTML Query Input Message eff
+ui ::
+  forall m.
+  MonadAff m =>
+  H.Component HH.HTML Query Input Message m
 ui =
-  H.component
-    { initialState
-    , render
-    , eval
-    , receiver: const Nothing
+  H.mkComponent
+  { initialState
+  , render
+  , eval: H.mkEval $ H.defaultEval
+    { handleAction = handleAction
+    , handleQuery = handleQuery
     }
-    where
-      initialState pager =
-        { config: defaultConfig
-        , pager
-        }
+  }
+  where
+    initialState pager =
+      { config: defaultConfig
+      , pager
+      }
 
-render :: State -> H.ComponentHTML Query
+render ::
+  forall m.
+  MonadEffect m =>
+  State -> H.ComponentHTML Action () m
 render state = case range of
   [_] -> HH.div_ []
   _ ->
     HH.nav_
-    [
-      HH.ul
+    [ HH.ul
       [ HP.class_ $ H.ClassName "pagination" ]
       $  [ renderLinkCell (labels.first) first
          , renderLinkCell (labels.previous) $ max first (current - 1)
@@ -124,10 +117,9 @@ render state = case range of
     renderLinkCell label page =
       HH.li
       [ HP.class_ $ H.ClassName $ "page-item" <> if page == current then " disabled" else "" ]
-      [
-        HH.button
+      [ HH.button
         [ HP.class_ $ H.ClassName "page-link"
-        , HE.onClick $ HE.input_ $ Select page
+        , HE.onClick $ const $ Just $ Select page
         ]
         [ HH.text label ]
       ]
@@ -137,8 +129,7 @@ render state = case range of
     renderActiveCell label =
       HH.li
       [ HP.class_ $ H.ClassName "page-item active" ]
-      [
-        HH.button
+      [ HH.button
         [ HP.class_ $ H.ClassName "page-link"
         ]
         [ HH.text label ]
@@ -147,20 +138,26 @@ render state = case range of
     renderDisabledCell label =
       HH.li
       [ HP.class_ $ H.ClassName "page-item disabled" ]
-      [
-        HH.button
+      [ HH.button
         [ HP.class_ $ H.ClassName "page-link"
         ]
         [ HH.text label ]
       ]
 
 
-eval :: forall eff. Query ~> H.ComponentDSL State Query Message eff
-eval = case _ of
-  Select i next -> do
+handleAction ::
+  forall m.
+  MonadAff m =>
+  Action -> H.HalogenM State Action () Message m Unit
+handleAction = case _ of
+  Select i -> do
     H.raise $ Selected i
-    pure next
 
+
+handleQuery ::
+  forall m a.
+  Query a -> H.HalogenM State Action () Message m (Maybe a)
+handleQuery = case _ of
   SetPager pager next -> do
-    H.modify _{ pager = pager }
-    pure next
+    H.modify_ _{ pager = pager }
+    pure $ Just next

@@ -1,36 +1,33 @@
 module Api.Photos where
 
-import Prelude
+import AppPrelude
 
 import Api (Client)
 import Api as Api
-import Control.Monad.Aff (Aff)
-import Data.Lens ((^.))
 import Model.Photo (Photo, PhotoId, _id)
-import Network.HTTP.Affjax (AJAX)
 
 
-index :: forall eff. Client -> Aff (ajax :: AJAX | eff) (Array Photo)
+index :: Client -> Aff (Array Photo)
 index cli = Api.get cli path
   where
     path = "/photos"
 
-filter :: forall eff. Client -> Api.FilteringMap -> Aff (ajax :: AJAX | eff) (Array Photo)
+filter :: Client -> Api.FilteringMap -> Aff (Array Photo)
 filter cli params = Api.get cli path
   where
     path = "/photos?" <> Api.buildQuery params
 
-find :: forall eff. Client -> PhotoId -> Aff (ajax :: AJAX | eff) Photo
+find :: Client -> PhotoId -> Aff Photo
 find cli photoId = Api.get cli path
   where
     path = "/photos/" <> show photoId
 
-update :: forall eff. Client -> Photo -> Aff (ajax :: AJAX | eff) Photo
+update :: Client -> Photo -> Aff Photo
 update cli photo = Api.patch cli path photo
   where
     path = "/photos/" <> show (photo ^. _id)
 
-destroy :: forall eff. Client -> PhotoId -> Aff (ajax :: AJAX | eff) Unit
+destroy :: Client -> PhotoId -> Aff Unit
 destroy cli photoId = Api.delete cli path
   where
     path = "/photos/" <> show photoId

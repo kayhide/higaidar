@@ -1,83 +1,77 @@
 module Model.Pest where
 
-import Prelude
+import AppPrelude
 
-import Control.Monad.Eff.Unsafe (unsafePerformEff)
-import Control.Monad.Except (mapExcept)
+import Data.Argonaut (class DecodeJson, class EncodeJson, decodeJson, encodeJson)
 import Data.DateTime (DateTime)
-import Data.Either (Either(..), either)
-import Data.Foreign (F, Foreign, ForeignError(TypeMismatch), readString, tagOf, toForeign)
-import Data.Foreign.Class (class Decode, class Encode, decode)
-import Data.Foreign.Index ((!))
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
-import Data.JSDate (parse, toDateTime)
-import Data.Lens (Lens', lens)
+import Data.Lens (Lens')
+import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
-import Data.List.NonEmpty as NEL
-import Data.Maybe (maybe)
-import Data.Symbol (SProxy(..))
+import Model.DateTime (decodeDateTime, encodeDateTime)
+import Record as Record
+
 
 type PestId = Int
 
-type PestRec
-  = { id :: PestId
-    , label :: String
-    , created_at :: DateTime
-    , updated_at :: DateTime
-    }
-newtype Pest = Pest PestRec
-
-_Pest :: Lens' Pest PestRec
-_Pest = lens (\(Pest r) -> r) (\_ r -> Pest r)
+newtype Pest =
+  Pest
+  { id :: PestId
+  , label :: String
+  , created_at :: DateTime
+  , updated_at :: DateTime
+  }
 
 _id :: Lens' Pest PestId
-_id = _Pest <<< prop (SProxy :: SProxy "id")
+_id = _Newtype <<< prop (SProxy :: SProxy "id")
 
 _label :: Lens' Pest String
-_label = _Pest <<< prop (SProxy :: SProxy "label")
+_label = _Newtype <<< prop (SProxy :: SProxy "label")
 
 _created_at :: Lens' Pest DateTime
-_created_at = _Pest <<< prop (SProxy :: SProxy "created_at")
+_created_at = _Newtype <<< prop (SProxy :: SProxy "created_at")
 
 _updated_at :: Lens' Pest DateTime
-_updated_at = _Pest <<< prop (SProxy :: SProxy "updated_at")
+_updated_at = _Newtype <<< prop (SProxy :: SProxy "updated_at")
 
 
+derive instance newtypePest :: Newtype Pest _
 derive instance genericPest :: Generic Pest _
 instance showPest :: Show Pest where
   show = genericShow
 
-instance decodePest :: Decode Pest where
-  decode v = do
-    id <- decode =<< v ! "id"
-    label <- decode =<< v ! "label"
-    created_at <- readDateTime =<< v ! "created_at"
-    updated_at <- readDateTime =<< v ! "updated_at"
-    pure $ Pest { id, label, created_at, updated_at }
+instance encodeJsonPest :: EncodeJson Pest where
+  encodeJson (Pest pest) =
+    encodeJson
+    <<< Record.modify (SProxy :: _ "created_at") encodeDateTime
+    <<< Record.modify (SProxy :: _ "updated_at") encodeDateTime
+    $ pest
 
-instance encodePest :: Encode Pest where
-  encode = toForeign <<< toEntity
+instance decodeJsonPest :: DecodeJson Pest where
+  decodeJson json = do
+    obj <- decodeJson json
+    createdAt <- decodeDateTime obj.created_at
+    updatedAt <- decodeDateTime obj.updated_at
+    pure $ wrap
+      <<< Record.modify (SProxy :: _ "created_at") (const createdAt)
+      <<< Record.modify (SProxy :: _ "updated_at") (const updatedAt)
+      $ obj
 
 
-readDateTime :: Foreign -> F DateTime
-readDateTime value = mapExcept (either (const error) fromString) $ readString value
-  where
-    fromString = maybe error pure <<< toDateTime <<< unsafePerformEff <<< parse
-    error = Left $ NEL.singleton $ TypeMismatch "DateTime" (tagOf value)
 
 toEntity :: Pest -> PestEntity
 toEntity (Pest { label }) = PestEntity { label }
 
 
-type PestEntityRec
-  = { label :: String
-    }
-newtype PestEntity = PestEntity PestEntityRec
+newtype PestEntity =
+  PestEntity
+  { label :: String
+  }
 
+derive instance newtypePestEntity :: Newtype PestEntity _
 derive instance genericPestEntity :: Generic PestEntity _
 instance showPestEntity :: Show PestEntity where
   show = genericShow
 
-instance encodePestEntity :: Encode PestEntity where
-  encode (PestEntity { label }) = toForeign { label }
+derive newtype instance encodeJsonPestEntity :: EncodeJson PestEntity

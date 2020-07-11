@@ -1,83 +1,85 @@
 module Component.UploadUI where
 
-import Prelude
+import AppPrelude
 
+import Affjax (URL)
+import Affjax as Affjax
+import Affjax.RequestBody as RequestBody
 import Api as Api
 import Api.Photos.SignedUrl as PhotosSigneUrl
 import Component.HTML.LoadingIndicator as LoadingIndicator
 import Component.Util as Util
-import Control.Monad.Aff (Aff, attempt)
-import Control.Monad.Eff.Unsafe (unsafePerformEff)
-import Control.Monad.Except (ExceptT, runExceptT, throwError)
-import Control.Monad.Trans.Class (lift)
-import DOM.Event.Event (Event)
-import DOM.Event.Event as Event
-import DOM.File.File as File
-import DOM.File.FileList as FileList
-import DOM.File.Types (fileToBlob)
-import DOM.HTML.HTMLInputElement as DOM
-import DOM.HTML.Indexed.InputType as InputType
-import Data.Either (Either(Left, Right), hush)
-import Data.Lens (set)
-import Data.Maybe (Maybe(Nothing, Just), maybe)
+import Control.Monad.Except (runExceptT, throwError)
+import DOM.HTML.Indexed.InputAcceptType (InputAcceptTypeAtom(..))
+import Data.Lens (_Just)
 import Data.MediaType (MediaType(..))
-import Data.URI.URI (_fragment, _query)
-import Data.URI.URI as URI
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import I18n.Ja as Ja
-import Network.HTTP.Affjax (AJAX, URL)
-import Network.HTTP.Affjax as Affjax
-import Unsafe.Coerce (unsafeCoerce)
-
-
-data Slot = Slot
-derive instance eqSlot :: Eq Slot
-derive instance ordSlot :: Ord Slot
+import Text.Parsing.Parser (runParser)
+import URI as URI
+import URI.AbsoluteURI (AbsoluteURIOptions, _query)
+import URI.AbsoluteURI as AbsoluteURI
+import URI.HostPortPair (HostPortPair)
+import URI.HostPortPair as HostPortPair
+import Web.Event.Event (Event)
+import Web.Event.Event as Event
+import Web.File.File as File
+import Web.File.FileList as FileList
+import Web.HTML.HTMLInputElement as HTMLInputElement
 
 
 type Config =
   { client :: Api.Client
   }
 
+data Action
+  = SetFile Event
+
 type State =
   { config :: Config
   , busy :: Boolean
   }
 
-data Query a
-  = Initialize a
-  | SetFile Event a
-
 type Input = Config
+
+type Query = Const Void
 
 data Message
   = Uploaded URL
   | Failed String
 
 
-type Eff_ eff = Aff (ajax :: AJAX | eff)
-
-ui :: forall eff. H.Component HH.HTML Query Input Message (Eff_ eff)
+ui ::
+  forall m.
+  MonadAff m =>
+  H.Component HH.HTML Query Input Message m
 ui =
-  H.lifecycleComponent
-    { initialState: { config: _
-                    , busy: false
-                    }
-    , render
-    , eval
-    , receiver: const Nothing
-    , initializer: Just $ H.action Initialize
-    , finalizer: Nothing
+  H.mkComponent
+  { initialState
+  , render
+  , eval:
+    H.mkEval
+    $ H.defaultEval
+    { handleAction = handleAction
     }
+  }
 
-render :: State -> H.ComponentHTML Query
+  where
+    initialState config =
+      { config
+      , busy: false
+      }
+
+render ::
+  forall m.
+  MonadEffect m =>
+  State -> H.ComponentHTML Action () m
 render state =
   HH.div_
-  [
-    LoadingIndicator.render state.busy
+  [ LoadingIndicator.render state.busy
   , renderUploadButton
   ]
 
@@ -85,61 +87,66 @@ render state =
     renderUploadButton = case state.busy of
       false ->
         HH.label_
-        [
-          HH.input
+        [ HH.input
           [ HP.class_ $ H.ClassName "d-none"
-          , HP.type_ InputType.InputFile
-          , HP.accept $ MediaType "image/*"
-          , HE.onChange $ HE.input SetFile
+          , HP.type_ $ HP.InputFile
+          , HP.accept $ HP.InputAcceptType
+            [ AcceptMediaType $ MediaType "image/*" ]
+          , HE.onChange $ Just <<< SetFile
           ]
         , HH.span
           [ HP.class_ $ H.ClassName "btn btn-success" ]
-          [
-            HH.text Ja.take_photo
+          [ HH.text Ja.take_photo
           ]
         ]
       true ->
         HH.div_
-        [
-          HH.span
+        [ HH.span
           [ HP.class_ $ H.ClassName "btn btn-success disabled" ]
-          [
-            HH.text Ja.take_photo
+          [ HH.text Ja.take_photo
           ]
         ]
 
-eval :: forall eff. Query ~> H.ComponentDSL State Query Message (Eff_ eff)
-eval = case _ of
-  Initialize next -> do
-    pure next
-
-  SetFile e next -> do
-    let elm = unsafeCoerce $ Event.target e
-    let files = unsafePerformEff $ DOM.files elm
-    let file = join $ FileList.item 0 <$> files
+handleAction ::
+  forall m.
+  MonadAff m =>
+  Action -> H.HalogenM State Action () Message m Unit
+handleAction = case _ of
+  SetFile e -> do
+    let elm = HTMLInputElement.fromEventTarget =<< Event.target e
+    files <- liftEffect $ traverse HTMLInputElement.files elm
+    let file = join $ FileList.item 0 <$> join files
 
     Util.whenNotBusy_ do
       res <- runExceptT do
-        blob <- maybe (throwError "File not set") (pure <<< fileToBlob) file
+        blob <- maybe (throwError "File not set") (pure <<< File.toBlob) file
         filename <- maybe (throwError "File not set") (pure <<< File.name) file
-        signed_url <- getSignedUrl filename
+        cli <- H.gets _.config.client
+        signed_url <- Util.onLeft "Failed to issue signed url"
+                      =<< (H.liftAff $ attempt $ PhotosSigneUrl.create cli filename)
         void $ Util.onLeft "Failed to upload"
-          =<< (H.liftAff $ attempt $ Affjax.put_ signed_url blob)
+          =<< (H.liftAff $ attempt $ Affjax.put_ signed_url $ Just $ RequestBody.blob blob)
         pure signed_url
 
       case res of
         Right signed_url -> do
-          let uri = URI.parse signed_url
-              url = URI.print <<< set _query Nothing <<< set _fragment Nothing <$> hush uri
+          let uri = hush $ runParser (signed_url :: String) (AbsoluteURI.parser absoluteURIOptions)
+              url = AbsoluteURI.print absoluteURIOptions <$> (uri # _Just <<< _query .~ Nothing)
           H.raise $ maybe (Failed "Bad url") Uploaded url
         Left msg ->
           H.raise $ Failed msg
 
-    pure next
 
-
-getSignedUrl :: forall eff. String -> ExceptT String (H.ComponentDSL State Query Message (Eff_ eff)) URL
-getSignedUrl filename = do
-    cli <- lift $ H.gets _.config.client
-    Util.onLeft "Failed to issue signed url"
-      =<< (H.liftAff $ attempt $ PhotosSigneUrl.create cli filename)
+absoluteURIOptions ∷ Record (AbsoluteURIOptions URI.UserInfo (HostPortPair URI.Host URI.Port) URI.Path URI.HierPath URI.Query)
+absoluteURIOptions =
+  { parseUserInfo: pure
+  , printUserInfo: identity
+  , parseHosts: HostPortPair.parser pure pure
+  , printHosts: HostPortPair.print identity identity
+  , parsePath: pure
+  , printPath: identity
+  , parseHierPath: pure
+  , printHierPath: identity
+  , parseQuery: pure
+  , printQuery: identity
+  }

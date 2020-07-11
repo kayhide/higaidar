@@ -1,24 +1,20 @@
 module Api.Users where
 
-import Prelude
+import AppPrelude
 
 import Api (Client, WithRange)
 import Api as Api
-import Control.Monad.Aff (Aff)
 import Data.Array as Array
-import Data.Lens ((^.))
-import Data.Maybe (Maybe(..))
 import Data.String as String
 import Model.User (User, UserEntity, UserId, _id)
-import Network.HTTP.Affjax (AJAX)
 
 
-index :: forall eff. Client -> Aff (ajax :: AJAX | eff) (Array User)
+index :: Client -> Aff (Array User)
 index cli = Api.get cli path
   where
     path = "/users"
 
-page :: forall eff. Client -> Int -> Int -> Aff (ajax :: AJAX | eff) (WithRange (Array User))
+page :: Client -> Int -> Int -> Aff (WithRange (Array User))
 page cli offset limit = Api.getWithRange cli path
   where
     query = Array.intercalate "&" $ Array.catMaybes
@@ -27,28 +23,28 @@ page cli offset limit = Api.getWithRange cli path
             ]
     path = if String.null query then "/users" else "/users?" <> query
 
-find :: forall eff. Client -> UserId -> Aff (ajax :: AJAX | eff) User
+find :: Client -> UserId -> Aff User
 find cli userId = Api.get cli path
   where
     path = "/users/" <> show userId
 
-some :: forall eff. Client -> Array UserId -> Aff (ajax :: AJAX | eff) (Array User)
+some :: Client -> Array UserId -> Aff (Array User)
 some cli ids = Api.get cli path
   where
     path = "/users?id=in(" <> (Array.intercalate "," $ show <$> ids) <> ")"
 
 
-create :: forall eff. Client -> UserEntity -> Aff (ajax :: AJAX | eff) User
+create :: Client -> UserEntity -> Aff User
 create cli user = Api.post cli path user
   where
     path = "/users"
 
-update :: forall eff. Client -> User -> Aff (ajax :: AJAX | eff) User
+update :: Client -> User -> Aff User
 update cli user = Api.patch cli path user
   where
     path = "/users/" <> show (user ^. _id)
 
-destroy :: forall eff. Client -> UserId -> Aff (ajax :: AJAX | eff) Unit
+destroy :: Client -> UserId -> Aff Unit
 destroy cli userId = Api.delete cli path
   where
     path = "/users/" <> show userId

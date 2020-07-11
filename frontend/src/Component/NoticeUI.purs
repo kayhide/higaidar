@@ -1,17 +1,14 @@
 module Component.NoticeUI where
 
-import Prelude
+import AppPrelude
 
-import Control.Monad.Aff (Aff, Milliseconds(Milliseconds), delay, error)
-import Control.Monad.Eff.Exception (Error)
+import Control.Monad.State (class MonadState)
 import Data.Lens (Lens, assign, modifying, use)
 import Data.Lens.At (at)
 import Data.Lens.Index (ix)
 import Data.Lens.Record (prop)
 import Data.Map (Map)
 import Data.Map as Map
-import Data.Maybe (Maybe(Nothing, Just))
-import Data.Symbol (SProxy(..))
 import Data.Tuple as Tuple
 import Halogen as H
 import Halogen.HTML as HH
@@ -27,23 +24,17 @@ noticeBody (Info s) = s
 noticeBody (Alert s) = s
 
 
-data Slot = Slot
-derive instance eqNoticeSlot :: Eq Slot
-derive instance ordNoticeSlot :: Ord Slot
-
-
 type ItemId = Int
 
-type Item m =
+type Item =
   { notice :: Notice
   , id :: ItemId
   , animated :: Array String
   , pinned :: Boolean
-  , canceler :: Error -> m Unit
   }
 
-type State m =
-  { items :: Map ItemId (Item m)
+type State =
+  { items :: Map ItemId Item
   , lastId :: ItemId
   }
 
@@ -53,49 +44,58 @@ _items = prop (SProxy :: SProxy "items")
 _lastId :: forall a b r. Lens { lastId :: a | r } { lastId :: b | r } a b
 _lastId = prop (SProxy :: SProxy "lastId")
 
-data Query a
-  = Post Notice a
-  | Pin ItemId a
-  | WaitAndClose ItemId Milliseconds a
+data Action
+  = Pin ItemId
+  | WaitAndClose ItemId Milliseconds
 
 type Input = Unit
+
+data Query a
+  = Post Notice a
 
 data Message =
   Closed Int
 
-ui :: forall eff. H.Component HH.HTML Query Input Message (Aff eff)
+ui ::
+  forall m.
+  MonadAff m =>
+  H.Component HH.HTML Query Input Message m
 ui =
-  H.component
-    { initialState: const { items: Map.empty, lastId: 0 }
-    , render
-    , eval
-    , receiver: const Nothing
+  H.mkComponent
+  { initialState
+  , render
+  , eval:
+    H.mkEval
+    $ H.defaultEval
+    { handleAction = handleAction
+    , handleQuery = handleQuery
     }
+  }
+  where
+    initialState _ = { items: Map.empty, lastId: 0 }
 
-render :: forall m. State m -> H.ComponentHTML Query
+render ::
+  forall m.
+  State -> H.ComponentHTML Action () m
 render state =
   HH.div
   [ HP.classes [ H.ClassName "fixed-bottom" ] ]
-  [
-    HH.div
+  [ HH.div
     [ HP.class_ $ H.ClassName "container" ]
-    $ renderItem <$> Tuple.snd <$> Map.toAscUnfoldable state.items
+    $ renderItem <$> Tuple.snd <$> Map.toUnfoldable state.items
   ]
 
   where
     renderItem item =
       HH.div
       [ HP.classes $ H.ClassName <$> item.animated ]
-      [
-        HH.div
+      [ HH.div
         [ classes item.notice ]
-        [
-          HH.div
+        [ HH.div
           [ HP.class_ $ H.ClassName "position-relative" ]
-          [
-            HH.text $ noticeBody item.notice
+          [ HH.text $ noticeBody item.notice
           , HH.a
-            [ HE.onClick $ HE.input_ $ Pin item.id
+            [ HE.onClick $ const $ Just $ Pin item.id
             , HP.href "#"
             , HP.class_ $ H.ClassName "position-absolute-right position-absolute-top alert-link"
             ]
@@ -114,8 +114,39 @@ render state =
     renderPinIcon true =
       HH.i [ HP.class_ $ H.ClassName "notice-pin notice-pin-on fa fa-map-pin" ] []
 
-eval :: forall eff. Query ~> H.ComponentDSL (State (Aff eff)) Query Message (Aff eff)
-eval = case _ of
+handleAction ::
+  forall m.
+  MonadAff m =>
+  Action -> H.HalogenM State Action () Message m Unit
+handleAction = case _ of
+  Pin id -> do
+    item <- findItem id
+    item # traverse_ \ item_ ->
+      case item_.pinned of
+        false -> do
+          updateItem id _{ pinned = true, animated = ["notice", "notice-in"] }
+
+        true -> do
+          updateItem id _{ pinned = false }
+          handleAction $ WaitAndClose id (Milliseconds 1000.0)
+
+
+  WaitAndClose id ms -> do
+    void $ HM.fork do
+      H.liftAff $ delay ms
+      item <- findItem id
+      item # traverse_ \ item_ -> do
+        when (not $ item_.pinned) do
+          updateItem id _{ animated = ["notice", "notice-out"] }
+          H.liftAff $ delay (Milliseconds 500.0)
+          deleteItem id
+
+
+handleQuery ::
+  forall m a.
+  MonadAff m =>
+  Query a -> H.HalogenM State Action () Message m (Maybe a)
+handleQuery = case _ of
   Post notice next -> do
     item <- newItem notice <<< (_ + 1) <$> H.gets _.lastId
     addItem item
@@ -123,58 +154,31 @@ eval = case _ of
       H.liftAff $ delay (Milliseconds 100.0)
       updateItem item.id _{ animated = ["notice", "notice-in"] }
 
-    eval $ WaitAndClose item.id (Milliseconds 3000.0) next
-
-  Pin id next -> do
-    item <- findItem id
-    case item of
-      Just item_ -> do
-        case item_.pinned of
-          false -> do
-            updateItem id _{ pinned = true, animated = ["notice", "notice-in"] }
-            H.liftAff $ item_.canceler (error "cancelled")
-            pure next
-
-          true -> do
-            updateItem id _{ pinned = false }
-            eval $ WaitAndClose id (Milliseconds 1000.0) next
-
-      Nothing -> pure next
+    handleAction $ WaitAndClose item.id (Milliseconds 3000.0)
+    pure $ Just next
 
 
-  WaitAndClose id ms next -> do
-    item <- findItem id
-    case item of
-      Just item_ -> do
-        H.liftAff $ item_.canceler (error "cancelled")
-        canceler <- HM.fork do
-          H.liftAff $ delay ms
-          updateItem id _{ animated = ["notice", "notice-out"] }
-          H.liftAff $ delay (Milliseconds 500.0)
-          deleteItem id
-        updateItem id _{ canceler = canceler }
-        pure next
+newItem :: Notice -> ItemId -> Item
+newItem notice id =
+  { notice
+  , id
+  , animated: ["notice", "notice-out"]
+  , pinned: false
+  }
 
-      Nothing -> pure next
+addItem :: forall m. MonadState State m => Item -> m Unit
+addItem item = do
+  assign (_items <<< at item.id) (Just item)
+  assign _lastId item.id
 
-  where
-    newItem notice id =
-      { notice: notice
-      , id: id
-      , animated: ["notice", "notice-out"]
-      , pinned: false
-      , canceler: const $ pure unit
-      }
+findItem :: forall m. MonadState State m => ItemId -> m (Maybe Item)
+findItem id =
+  use (_items <<< at id)
 
-    addItem item = do
-      assign (_items <<< at item.id) (Just item)
-      assign _lastId item.id
+updateItem :: forall m. MonadState State m => ItemId -> (Item -> Item) -> m Unit
+updateItem id updater =
+  modifying (_items <<< ix id) updater
 
-    findItem id =
-      use (_items <<< at id)
-
-    updateItem id updater =
-      modifying (_items <<< ix id) updater
-
-    deleteItem id =
-      assign (_items <<< at id) Nothing
+deleteItem :: forall m. MonadState State m => ItemId -> m Unit
+deleteItem id =
+  assign (_items <<< at id) Nothing

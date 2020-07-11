@@ -1,8 +1,9 @@
 module Component.Admin.Layout where
 
-import Prelude
+import AppPrelude
 
 import Api as Api
+import AppConfig (AppConfig)
 import Component.Admin.PestListPage as PestListPage
 import Component.Admin.PhotoListPage as PhotoListPage
 import Component.Admin.Route as R
@@ -10,41 +11,24 @@ import Component.Admin.UserEditPage as UserEditPage
 import Component.Admin.UserListPage as UserListPage
 import Component.LoginUI as LoginUI
 import Component.NoticeUI as NoticeUI
-import Control.Monad.Aff (Aff)
-import Control.Monad.Eff.Now (NOW)
-import Control.Monad.Eff.Now as Now
-import DOM (DOM)
-import Data.Const (Const)
-import Data.DateTime.Locale (Locale(..), LocaleName(..))
-import Data.Maybe (Maybe(Just, Nothing))
 import Data.String as String
 import Data.Time.Duration (Minutes(..))
-import Dom.Storage (STORAGE)
 import Halogen as H
-import Halogen.Component.ChildPath as CP
-import Halogen.Data.Prism (type (<\/>), type (\/))
 import Halogen.HTML as HH
-import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import I18n.Ja as Ja
+import Model.DateTime (Locale(..), getLocale)
 import Model.User (User(..))
-import Network.HTTP.Affjax (AJAX)
 import Routing.Hash as Routing
 
 
-type AppConfig =
-  { stage :: String
-  , apiEndpoint :: String
-  }
-
-data Query a
-  = Initialize a
-  | HandleLogin LoginUI.Message a
-  | HandleUserList UserListPage.Message a
-  | HandleUserEdit UserEditPage.Message a
-  | HandlePhotoList PhotoListPage.Message a
-  | HandlePestList PestListPage.Message a
-  | Goto R.Location a
+data Action
+  = Initialize
+  | HandleLogin LoginUI.Message
+  | HandleUserList UserListPage.Message
+  | HandleUserEdit UserEditPage.Message
+  | HandlePhotoList PhotoListPage.Message
+  | HandlePestList PestListPage.Message
 
 type State =
   { appConfig :: AppConfig
@@ -55,75 +39,55 @@ type State =
 
 type Input = AppConfig
 
+data Query a
+  = Goto R.Location a
+
 type Message = Void
 
-type ChildQuery
-  = NoticeUI.Query
-    <\/> LoginUI.Query
-    <\/> UserListPage.Query
-    <\/> UserEditPage.Query
-    <\/> PhotoListPage.Query
-    <\/> PestListPage.Query
-    <\/> Const Void
+type ChildSlots =
+  ( notice :: H.Slot NoticeUI.Query NoticeUI.Message Unit
+  , login :: H.Slot (Const Void) LoginUI.Message Unit
+  , userList :: H.Slot (Const Void) UserListPage.Message Unit
+  , userEdit :: H.Slot (Const Void) UserEditPage.Message Unit
+  , photoList :: H.Slot (Const Void) PhotoListPage.Message Unit
+  , pestList :: H.Slot (Const Void) PestListPage.Message Unit
+  )
 
-type ChildSlot
-  = NoticeUI.Slot
-    \/ LoginUI.Slot
-    \/ UserListPage.Slot
-    \/ UserEditPage.Slot
-    \/ PhotoListPage.Slot
-    \/ PestListPage.Slot
-    \/ Void
-
-cpNotice :: CP.ChildPath NoticeUI.Query ChildQuery NoticeUI.Slot ChildSlot
-cpNotice = CP.cp1
-
-cpLogin :: CP.ChildPath LoginUI.Query ChildQuery LoginUI.Slot ChildSlot
-cpLogin = CP.cp2
-
-cpUserList :: CP.ChildPath UserListPage.Query ChildQuery UserListPage.Slot ChildSlot
-cpUserList = CP.cp3
-
-cpUserEdit :: CP.ChildPath UserEditPage.Query ChildQuery UserEditPage.Slot ChildSlot
-cpUserEdit = CP.cp4
-
-cpPhotoList :: CP.ChildPath PhotoListPage.Query ChildQuery PhotoListPage.Slot ChildSlot
-cpPhotoList = CP.cp5
-
-cpPestList :: CP.ChildPath PestListPage.Query ChildQuery PestListPage.Slot ChildSlot
-cpPestList = CP.cp6
-
-type Eff_ eff = Aff (ajax :: AJAX, dom :: DOM, now :: NOW, storage :: STORAGE | eff)
-
-ui :: forall eff. H.Component HH.HTML Query Input Message (Eff_ eff)
+ui ::
+  forall m.
+  MonadAff m =>
+  H.Component HH.HTML Query Input Message m
 ui =
-  H.lifecycleParentComponent
-    { initialState
-    , render
-    , eval
-    , receiver: const Nothing
-    , initializer: Just $ H.action Initialize
-    , finalizer: Nothing
+  H.mkComponent
+  { initialState
+  , render
+  , eval: H.mkEval $ H.defaultEval
+    { handleAction = handleAction
+    , handleQuery = handleQuery
+    , initialize = Just Initialize
     }
+  }
+
   where
     initialState appConfig@({ apiEndpoint }) =
       { appConfig
       , apiClient: Api.makeClient apiEndpoint
-      , locale: Locale (Just (LocaleName "GMT")) (Minutes 0.0)
+      , locale: Locale (Just "GMT") (Minutes 0.0)
       , location: R.Home
       }
 
 
-render :: forall eff. State -> H.ParentHTML Query ChildQuery ChildSlot (Eff_ eff)
+render ::
+  forall m.
+  MonadAff m =>
+  State -> H.ComponentHTML Action ChildSlots m
 render state =
   HH.div_
-  [
-    renderNavbar
-  , HH.slot' cpNotice NoticeUI.Slot NoticeUI.ui unit $ const Nothing
+  [ renderNavbar
+  , HH.slot (SProxy :: _ "notice") unit NoticeUI.ui unit $ const Nothing
   , HH.main
     [ HP.class_ $ H.ClassName "container mt-2 mb-5" ]
-    [
-      renderPage state.location
+    [ renderPage state.location
     ]
   ]
 
@@ -135,8 +99,7 @@ render state =
     renderNavbar =
       HH.nav
       [ HP.class_ $ H.ClassName "navbar navbar-expand navbar-dark bg-dark" ]
-      [
-        HH.a
+      [ HH.a
         [ HP.class_ $ H.ClassName "navbar-brand mb-0 d-none d-sm-block"
         , HP.href "/#/"
         ]
@@ -167,8 +130,7 @@ render state =
     renderMenuItem location text icon =
       HH.li
       [ HP.class_ $ H.ClassName "nav-item" ]
-      [
-        HH.a
+      [ HH.a
         [ HP.class_ $ H.ClassName "nav-link"
         , HP.href $ R.path location
         ]
@@ -176,8 +138,7 @@ render state =
       ]
 
     renderTextOrIcon text icon =
-      [
-        HH.span
+      [ HH.span
         [ HP.class_ $ H.ClassName "d-none d-sm-inline" ]
         [ HH.text text ]
       , HH.i
@@ -198,8 +159,7 @@ render state =
         withAuthentication
         $ HH.ul
         [ HP.class_ $ H.ClassName "nav flex-column" ]
-        [
-          HH.li
+        [ HH.li
           [ HP.class_ $ H.ClassName "nav-item" ]
           [
             HH.a
@@ -213,8 +173,7 @@ render state =
           ]
         , HH.li
           [ HP.class_ $ H.ClassName "nav-item" ]
-          [
-            HH.a
+          [ HH.a
             [ HP.class_ $ H.ClassName "nav-link"
             , HP.href $ R.path $ R.PhotosIndex
             ]
@@ -225,8 +184,7 @@ render state =
           ]
         , HH.li
           [ HP.class_ $ H.ClassName "nav-item" ]
-          [
-            HH.a
+          [ HH.a
             [ HP.class_ $ H.ClassName "nav-link"
             , HP.href $ R.path $ R.PestsIndex
             ]
@@ -238,79 +196,79 @@ render state =
         ]
 
       R.Login ->
-        HH.slot' cpLogin LoginUI.Slot LoginUI.ui client $ HE.input HandleLogin
+        HH.slot (SProxy :: _ "login") unit LoginUI.ui client $ Just <<< HandleLogin
 
       R.UsersIndex ->
         withAuthentication
-        $ HH.slot' cpUserList UserListPage.Slot UserListPage.ui { client, locale } $ HE.input HandleUserList
+        -- $ HH.slot' cpUserList UserListPage.Slot UserListPage.ui { client, locale } $ HE.input HandleUserList
+        $ HH.slot (SProxy :: _ "userList") unit UserListPage.ui { client, locale } $ Just <<< HandleUserList
 
       R.UsersShow userId ->
         withAuthentication
-        $ HH.slot' cpUserEdit UserEditPage.Slot UserEditPage.ui { userId, client, locale } $ HE.input HandleUserEdit
+        $ HH.slot (SProxy :: _ "userEdit") unit UserEditPage.ui { userId, client, locale } $ Just <<< HandleUserEdit
 
       R.PhotosIndex ->
         withAuthentication
-        $ HH.slot' cpPhotoList PhotoListPage.Slot PhotoListPage.ui { client, locale } $ HE.input HandlePhotoList
+        $ HH.slot (SProxy :: _ "photoList") unit PhotoListPage.ui { client, locale } $ Just <<< HandlePhotoList
 
       R.PestsIndex ->
         withAuthentication
-        $ HH.slot' cpPestList PestListPage.Slot PestListPage.ui { client, locale } $ HE.input HandlePestList
+        $ HH.slot (SProxy :: _ "pestList") unit PestListPage.ui { client, locale } $ Just <<< HandlePestList
 
     withAuthentication html =
       if isAuthenticated
       then html
-      else
-        HH.slot' cpLogin LoginUI.Slot LoginUI.ui client $ HE.input HandleLogin
+      else HH.slot (SProxy :: _ "login") unit LoginUI.ui client $ Just <<< HandleLogin
 
-eval :: forall eff. Query ~> H.ParentDSL State Query ChildQuery ChildSlot Message (Eff_ eff)
-eval = case _ of
-  Initialize next -> do
-    locale <- H.liftEff Now.locale
-    H.modify _{ locale = locale }
+handleAction ::
+  forall m.
+  MonadEffect m =>
+  MonadAff m =>
+  Action -> H.HalogenM State Action ChildSlots Void m Unit
+handleAction = case _ of
+  Initialize -> do
+    locale <- liftEffect getLocale
+    H.modify_ _{ locale = locale }
 
-    hash <- H.liftEff $ Routing.getHash
+    hash <- liftEffect Routing.getHash
     when (String.null hash) $
-      H.liftEff $ Routing.setHash "/"
+      liftEffect $ Routing.setHash "/"
 
-    pure next
-
-  HandleLogin (LoginUI.Authenticated client) next -> do
-    H.modify _{ apiClient = client }
+  HandleLogin (LoginUI.Authenticated client) -> do
+    H.modify_ _{ apiClient = client }
     postInfo "Authenticated."
-    pure next
 
-  HandleLogin (LoginUI.Unauthenticated client) next -> do
-    H.modify _{ apiClient = client }
+  HandleLogin (LoginUI.Unauthenticated client) -> do
+    H.modify_ _{ apiClient = client }
     postInfo "Unauthenticated."
-    pure next
 
-  HandleLogin (LoginUI.Failed client _ s) next -> do
-    H.modify _{ apiClient = client }
+  HandleLogin (LoginUI.Failed client _ s) -> do
+    H.modify_ _{ apiClient = client }
     postAlert s
-    pure next
 
-  HandleUserList (UserListPage.Failed s) next -> do
+  HandleUserList (UserListPage.Failed s) -> do
     postAlert s
-    pure next
 
-  HandleUserEdit (UserEditPage.Failed s) next -> do
+  HandleUserEdit (UserEditPage.Failed s) -> do
     postAlert s
-    pure next
 
-  HandlePhotoList (PhotoListPage.Failed s) next -> do
+  HandlePhotoList (PhotoListPage.Failed s) -> do
     postAlert s
-    pure next
 
-  HandlePestList (PestListPage.Failed s) next -> do
+  HandlePestList (PestListPage.Failed s) -> do
     postAlert s
-    pure next
-
-  Goto loc next -> do
-    H.modify _{ location = loc }
-    pure next
 
   where
     postNotice notice =
-      void $ H.query' cpNotice NoticeUI.Slot $ H.action $ NoticeUI.Post notice
+      void $ H.query (SProxy :: SProxy "notice") unit $ H.tell $ NoticeUI.Post notice
     postInfo s = postNotice $ NoticeUI.Info s
     postAlert s = postNotice $ NoticeUI.Alert s
+
+
+handleQuery ::
+  forall m a.
+  Query a -> H.HalogenM State Action ChildSlots Message m (Maybe a)
+handleQuery = case _ of
+  Goto loc next -> do
+    H.modify_ _{ location = loc }
+    pure $ Just next

@@ -1,18 +1,17 @@
 module Component.HTML.DateTime where
 
-import Prelude
+import AppPrelude
 
 import Data.DateTime (DateTime)
 import Data.DateTime as DateTime
-import Data.DateTime.Locale (Locale(..))
-import Data.Either (Either(..), either)
 import Data.Formatter.DateTime (formatDateTime)
-import Data.Maybe (maybe)
+import Data.Time.Duration (negateDuration)
 import Halogen.HTML as HH
+import Model.DateTime (Locale(..))
 
 
-render :: forall p i. DateTime -> Locale -> HH.HTML p i
+render :: forall props act. DateTime -> Locale -> HH.HTML props act
 render dt (Locale _ dur) =
-  HH.text $ either id id $ maybe (Left "") (formatDateTime "YYYY/MM/DD HH:mm:ss") dt_
+  HH.text $ either identity identity $ maybe (Left "") (formatDateTime "YYYY/MM/DD HH:mm:ss") dt_
   where
-    dt_ = (DateTime.adjust (negate dur)) dt
+    dt_ = (DateTime.adjust (negateDuration dur)) dt

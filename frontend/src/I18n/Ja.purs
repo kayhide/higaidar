@@ -1,6 +1,6 @@
 module I18n.Ja where
 
-import Prelude
+import AppPrelude
 
 
 higaidar :: String

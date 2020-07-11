@@ -1,10 +1,9 @@
 module Component.Admin.Route where
 
-import Prelude
+import AppPrelude
 
 import Control.Alt ((<|>))
-import Routing.Match (Match)
-import Routing.Match.Class (int, lit)
+import Routing.Match (Match, int, lit)
 
 data Location
   = Home

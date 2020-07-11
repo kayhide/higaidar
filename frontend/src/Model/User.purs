@@ -1,104 +1,94 @@
 module Model.User where
 
-import Prelude
+import AppPrelude
 
-import Control.Monad.Eff.Unsafe (unsafePerformEff)
-import Control.Monad.Except (mapExcept)
+import Data.Argonaut (class DecodeJson, class EncodeJson, decodeJson, encodeJson)
 import Data.DateTime (DateTime)
-import Data.Either (Either(..), either)
-import Data.Foreign (F, Foreign, ForeignError(TypeMismatch), readString, tagOf, toForeign)
-import Data.Foreign.Class (class Decode, class Encode, decode)
-import Data.Foreign.Index ((!))
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
-import Data.JSDate (parse, toDateTime)
-import Data.Lens (Lens', lens)
+import Data.Lens (Lens')
+import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
-import Data.List.NonEmpty as NEL
-import Data.Maybe (maybe)
-import Data.Symbol (SProxy(..))
+import Model.DateTime (decodeDateTime, encodeDateTime)
+import Record as Record
+
 
 type UserId = Int
 
-type UserRec
-  = { id :: UserId
-    , code :: String
-    , tel :: String
-    , name :: String
-    , is_admin :: Boolean
-    , created_at :: DateTime
-    , updated_at :: DateTime
-    }
-newtype User = User UserRec
-
-_User :: Lens' User UserRec
-_User = lens (\(User r) -> r) (\_ r -> User r)
+newtype User =
+  User
+  { id :: UserId
+  , code :: String
+  , tel :: String
+  , name :: String
+  , is_admin :: Boolean
+  , created_at :: DateTime
+  , updated_at :: DateTime
+  }
 
 _id :: Lens' User UserId
-_id = _User <<< prop (SProxy :: SProxy "id")
+_id = _Newtype <<< prop (SProxy :: SProxy "id")
 
 _code :: Lens' User String
-_code = _User <<< prop (SProxy :: SProxy "code")
+_code = _Newtype <<< prop (SProxy :: SProxy "code")
 
 _tel :: Lens' User String
-_tel = _User <<< prop (SProxy :: SProxy "tel")
+_tel = _Newtype <<< prop (SProxy :: SProxy "tel")
 
 _name :: Lens' User String
-_name = _User <<< prop (SProxy :: SProxy "name")
+_name = _Newtype <<< prop (SProxy :: SProxy "name")
 
 _is_admin :: Lens' User Boolean
-_is_admin = _User <<< prop (SProxy :: SProxy "is_admin")
+_is_admin = _Newtype <<< prop (SProxy :: SProxy "is_admin")
 
 _created_at :: Lens' User DateTime
-_created_at = _User <<< prop (SProxy :: SProxy "created_at")
+_created_at = _Newtype <<< prop (SProxy :: SProxy "created_at")
 
 _updated_at :: Lens' User DateTime
-_updated_at = _User <<< prop (SProxy :: SProxy "updated_at")
+_updated_at = _Newtype <<< prop (SProxy :: SProxy "updated_at")
 
 
 derive instance eqUser :: Eq User
 derive instance genericUser :: Generic User _
+derive instance newtypeUser :: Newtype User _
 instance showUser :: Show User where
   show = genericShow
 
-instance decodeUser :: Decode User where
-  decode v = do
-    id <- decode =<< v ! "id"
-    code <- decode =<< v ! "code"
-    tel <- decode =<< v ! "tel"
-    name <- decode =<< v ! "name"
-    is_admin <- decode =<< v ! "is_admin"
-    created_at <- readDateTime =<< v ! "created_at"
-    updated_at <- readDateTime =<< v ! "updated_at"
-    pure $ User { id, code, tel, name, is_admin, created_at, updated_at }
+instance encodeJsonUser :: EncodeJson User where
+  encodeJson (User user) =
+    encodeJson
+    <<< Record.modify (SProxy :: _ "created_at") encodeDateTime
+    <<< Record.modify (SProxy :: _ "updated_at") encodeDateTime
+    $ user
 
-instance encodeUser :: Encode User where
-  encode = toForeign <<< toEntity
+instance decodeJsonUser :: DecodeJson User where
+  decodeJson json = do
+    obj <- decodeJson json
+    createdAt <- decodeDateTime obj.created_at
+    updatedAt <- decodeDateTime obj.updated_at
+    pure $ wrap
+      <<< Record.modify (SProxy :: _ "created_at") (const createdAt)
+      <<< Record.modify (SProxy :: _ "updated_at") (const updatedAt)
+      $ obj
 
 type Users = Array User
 
-
-readDateTime :: Foreign -> F DateTime
-readDateTime value = mapExcept (either (const error) fromString) $ readString value
-  where
-    fromString = maybe error pure <<< toDateTime <<< unsafePerformEff <<< parse
-    error = Left $ NEL.singleton $ TypeMismatch "DateTime" (tagOf value)
 
 toEntity :: User -> UserEntity
 toEntity (User { code, tel, name, is_admin }) = UserEntity { code, tel, name, is_admin }
 
 
-type UserEntityRec
-  = { code :: String
-    , tel :: String
-    , name :: String
-    , is_admin :: Boolean
-    }
-newtype UserEntity = UserEntity UserEntityRec
+newtype UserEntity =
+  UserEntity
+  { code :: String
+  , tel :: String
+  , name :: String
+  , is_admin :: Boolean
+  }
 
+derive instance newtypeUserEntity :: Newtype UserEntity _
 derive instance genericUserEntity :: Generic UserEntity _
 instance showUserEntity :: Show UserEntity where
   show = genericShow
 
-instance encodeUserEntity :: Encode UserEntity where
-  encode (UserEntity { code, tel, name }) = toForeign { code, tel, name }
+derive newtype instance encodeJsonUserEntity :: EncodeJson UserEntity

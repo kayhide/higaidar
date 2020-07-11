@@ -1,11 +1,9 @@
 module Component.Util where
 
-import Prelude
+import AppPrelude
 
 import Control.Monad.Except (ExceptT, throwError)
-import Control.Monad.State (class MonadState, gets, modify)
-import Data.Either (Either, either)
-import Data.Maybe (Maybe(Just, Nothing), maybe)
+import Control.Monad.State (class MonadState, gets, modify_)
 
 
 onNothing :: forall m. Monad m => String -> Maybe ~> ExceptT String m
@@ -31,9 +29,9 @@ whenNotBusy action = do
     true ->
       pure Nothing
     false -> do
-      modify _{ busy = true }
+      modify_ _{ busy = true }
       x <- action
-      modify _{ busy = false }
+      modify_ _{ busy = false }
       pure $ Just x
 
 whenNotBusy_ :: forall m r a. Monad m => MonadState (BusyRec r) m => m a -> m Unit

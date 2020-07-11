@@ -1,6 +1,6 @@
 module Component.Admin.PhotoListPage where
 
-import Prelude
+import AppPrelude
 
 import Api as Api
 import Api.Photos as Photos
@@ -8,46 +8,36 @@ import Api.Users as Users
 import Component.HTML.LoadingIndicator as LoadingIndicator
 import Component.UploadUI as UploadUI
 import Component.Util as Util
-import Control.Monad.Aff (Aff, attempt)
 import Control.Monad.State (execState)
 import Data.Array as Array
-import Data.DateTime.Locale (Locale)
-import Data.Either (Either(Left, Right))
-import Data.Lens (assign, view, (^?))
+import Data.Lens (assign, view)
 import Data.Lens.At (at)
 import Data.Lens.Index (ix)
 import Data.Map (Map)
 import Data.Map as Map
-import Data.Maybe (Maybe(Nothing, Just), fromMaybe, maybe)
 import Data.Profunctor.Strong ((&&&))
-import Data.StrMap as StrMap
+import Foreign.Object as Object
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Query.HalogenM as HM
 import I18n.Ja as Ja
-import Model.Photo (Photo(Photo), PhotoId)
+import Model.DateTime (Locale)
+import Model.Photo (Photo (..), PhotoId)
 import Model.Photo as Photo
 import Model.User (User(..), UserId)
 import Model.User as User
-import Network.HTTP.Affjax (AJAX)
 
 
-data Slot = Slot
-derive instance eqSlot :: Eq Slot
-derive instance ordSlot :: Ord Slot
-
-
-data Query a
-  = Initialize a
-  | Reload a
-  | Destroy PhotoId a
-  | ToggleDeleting a
-  | SelectUser UserId a
-  | UnselectUser UserId a
-  | SelectPest String a
-  | UnselectPest String a
+data Action
+  = Reload
+  | Destroy PhotoId
+  | ToggleDeleting
+  | SelectUser UserId
+  | UnselectUser UserId
+  | SelectPest String
+  | UnselectPest String
 
 type State =
   { items :: Array Photo
@@ -65,24 +55,31 @@ type Input =
   , locale :: Locale
   }
 
+type Query = Const Void
+
 data Message
   = Failed String
 
-type ChildQuery = UploadUI.Query
-type ChildSlot = UploadUI.Slot
+type ChildSlots =
+  ( upload :: H.Slot UploadUI.Query UploadUI.Message Unit
+  )
 
-type Eff_ eff = Aff (ajax :: AJAX | eff)
-
-ui :: forall eff. H.Component HH.HTML Query Input Message (Eff_ eff)
+ui ::
+  forall m.
+  MonadAff m =>
+  H.Component HH.HTML Query Input Message m
 ui =
-  H.lifecycleParentComponent
-    { initialState
-    , render
-    , eval
-    , receiver: const Nothing
-    , initializer: Just $ H.action Initialize
-    , finalizer: Nothing
+  H.mkComponent
+  { initialState
+  , render
+  , eval:
+    H.mkEval
+    $ H.defaultEval
+    { handleAction = handleAction
+    , initialize = Just Reload
     }
+  }
+
   where
     initialState { client, locale } =
       { items: []
@@ -95,7 +92,10 @@ ui =
       , selectedPests: []
       }
 
-render :: forall eff. State -> H.ParentHTML Query ChildQuery ChildSlot (Eff_ eff)
+render ::
+  forall m.
+  MonadAff m =>
+  State -> H.ComponentHTML Action ChildSlots m
 render state =
   HH.div_
   [
@@ -132,7 +132,7 @@ render state =
       , HH.a
         [ HP.class_ $ H.ClassName "btn btn-secondary btn-outline"
         , HP.href $ "#/photos"
-        , HE.onClick $ HE.input_ $ UnselectUser userId
+        , HE.onClick $ const $ Just $ UnselectUser userId
         ]
         [
           HH.i [ HP.class_ $ H.ClassName "fa fa-times" ] []
@@ -152,7 +152,7 @@ render state =
       , HH.a
         [ HP.class_ $ H.ClassName "btn btn-secondary btn-outline"
         , HP.href $ "#/photos"
-        , HE.onClick $ HE.input_ $ UnselectPest pest
+        , HE.onClick $ const $ Just $ UnselectPest pest
         ]
         [
           HH.i [ HP.class_ $ H.ClassName "fa fa-times" ] []
@@ -165,7 +165,7 @@ render state =
       [
         HH.button
         [ HP.class_ $ H.ClassName $ "btn rounded-circle " <> if deleting then "btn-danger" else "btn-outline-danger"
-        , HE.onClick $ HE.input_ $ ToggleDeleting
+        , HE.onClick $ const $ Just $ ToggleDeleting
         ]
         [ HH.i [ HP.class_ $ H.ClassName "fa fa-trash" ] []
         ]
@@ -210,7 +210,7 @@ render state =
         HH.a
         [ HP.class_ $ H.ClassName "ml-auto small"
         , HP.href $ "#/photos?user_id=" <> show id
-        , HE.onClick $ HE.input_ $ SelectUser id
+        , HE.onClick $ const $ Just $ SelectUser id
         ]
         [
           HH.i [ HP.class_ $ H.ClassName "fa fa-user mr-2" ] []
@@ -226,7 +226,7 @@ render state =
         HH.a
         [ HP.class_ $ H.ClassName "ml-auto small"
         , HP.href $ "#/photos?pest=" <> pest
-        , HE.onClick $ HE.input_ $ SelectPest pest
+        , HE.onClick $ const $ Just $ SelectPest pest
         ]
         [ HH.text pest ]
       Nothing ->
@@ -244,28 +244,28 @@ render state =
         [
           HH.button
           [ HP.class_ $ H.ClassName "btn btn-danger rounded-circle"
-          , HE.onClick $ HE.input_ $ Destroy id
+          , HE.onClick $ const $ Just $ Destroy id
           ]
           [ HH.i [ HP.class_ $ H.ClassName "fa fa-times" ] []
           ]
         ]
       ]
 
-eval :: forall eff. Query ~> H.ParentDSL State Query ChildQuery ChildSlot Message (Eff_ eff)
-eval = case _ of
-  Initialize next -> do
-    eval $ Reload next
-
-  Reload next -> do
+handleAction ::
+  forall m.
+  MonadAff m =>
+  Action -> H.HalogenM State Action ChildSlots Message m Unit
+handleAction = case _ of
+  Reload -> do
     Util.whenNotBusy_ do
       { client, selectedUsers, selectedPests } <- H.get
-      let filters = flip execState StrMap.empty $ do
+      let filters = flip execState Object.empty $ do
             when (not $ Array.null selectedUsers) $
               assign (at "user_id") $ Just $ Api.In_ $ show <$> selectedUsers
             when (not $ Array.null selectedPests) $
               assign (at "pest") $ Just $ Api.In_ selectedPests
 
-      photos <- case StrMap.isEmpty filters of
+      photos <- case Object.isEmpty filters of
         true ->
           H.liftAff $ attempt $ Photos.index client
         false ->
@@ -273,14 +273,12 @@ eval = case _ of
 
       case photos of
         Right photos_ -> do
-          H.modify _{ items = photos_ }
+          H.modify_ _{ items = photos_ }
           void $ HM.fork loadUsers
         Left _ ->
           H.raise $ Failed "Failed to access api."
 
-    pure next
-
-  Destroy photoId next -> do
+  Destroy photoId -> do
     Util.whenNotBusy_ do
       cli <- H.gets _.client
       res <- H.liftAff $ attempt $ Photos.destroy cli photoId
@@ -288,46 +286,43 @@ eval = case _ of
       case res of
         Right _ -> do
           items <- Array.filter ((photoId /= _) <<< view Photo._id) <$> H.gets _.items
-          H.modify _{ items = items }
+          H.modify_ _{ items = items }
         Left _ ->
           H.raise $ Failed "Failed to destroy photo."
 
-    pure next
-
-  ToggleDeleting next -> do
+  ToggleDeleting -> do
     deleting <- not <$> H.gets _.deleting
-    H.modify _{ deleting = deleting }
-    pure next
+    H.modify_ _{ deleting = deleting }
 
-  SelectUser userId next -> do
+  SelectUser userId -> do
     { selectedUsers } <- H.get
     if selectedUsers == [userId]
       then
-        pure next
+        pure unit
       else do
-        H.modify _{ selectedUsers = Array.nub $ Array.cons userId selectedUsers }
-        eval $ Reload next
+        H.modify_ _{ selectedUsers = Array.nub $ Array.cons userId selectedUsers }
+        handleAction Reload
 
-  UnselectUser userId next -> do
+  UnselectUser userId -> do
     { selectedUsers } <- H.get
-    H.modify _{ selectedUsers = Array.delete userId selectedUsers }
-    eval $ Reload next
+    H.modify_ _{ selectedUsers = Array.delete userId selectedUsers }
+    handleAction Reload
 
-  SelectPest pest next -> do
+  SelectPest pest -> do
     { selectedPests } <- H.get
     if selectedPests == [pest]
       then
-        pure next
+        pure unit
       else do
-        H.modify _{ selectedPests = Array.nub $ Array.cons pest selectedPests }
-        eval $ Reload next
+        H.modify_ _{ selectedPests = Array.nub $ Array.cons pest selectedPests }
+        handleAction Reload
 
-  UnselectPest pest next -> do
+  UnselectPest pest -> do
     { selectedPests } <- H.get
-    H.modify _{ selectedPests = Array.delete pest selectedPests }
-    eval $ Reload next
+    H.modify_ _{ selectedPests = Array.delete pest selectedPests }
+    handleAction Reload
 
-loadUsers :: forall eff. H.ParentDSL State Query ChildQuery ChildSlot Message (Eff_ eff) Unit
+loadUsers :: forall m. MonadAff m => H.HalogenM State Action ChildSlots Message m Unit
 loadUsers = do
   { items, users } <- H.get
   let ids = Array.difference (Array.nub $ view Photo._user_id <$> items) (Array.fromFoldable $ Map.keys users)
@@ -338,8 +333,8 @@ loadUsers = do
 
     case res of
       Right users_ -> do
-        let addings = Map.fromFoldable $ (view User._id &&& id) <$> users_
-        H.modify _{ users = Map.union users addings }
+        let addings = Map.fromFoldable $ (view User._id &&& identity) <$> users_
+        H.modify_ _{ users = Map.union users addings }
       Left _ -> do
         H.raise $ Failed "Failed to load Users. Retrying..."
         loadUsers

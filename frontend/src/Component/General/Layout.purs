@@ -1,44 +1,28 @@
 module Component.General.Layout where
 
-import Prelude
+import AppPrelude
 
 import Api as Api
+import AppConfig (AppConfig)
 import Component.General.HomePage as HomePage
 import Component.General.Route as R
 import Component.LoginUI as LoginUI
 import Component.NoticeUI as NoticeUI
-import Control.Monad.Aff (Aff)
-import Control.Monad.Eff.Now (NOW)
-import Control.Monad.Eff.Now as Now
-import DOM (DOM)
-import Data.Const (Const)
-import Data.DateTime.Locale (Locale(..), LocaleName(..))
-import Data.Maybe (Maybe(Just, Nothing))
 import Data.String as String
 import Data.Time.Duration (Minutes(..))
-import Dom.Storage (STORAGE)
 import Halogen as H
-import Halogen.Component.ChildPath as CP
-import Halogen.Data.Prism (type (<\/>), type (\/))
 import Halogen.HTML as HH
-import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import I18n.Ja as Ja
+import Model.DateTime (Locale(..), getLocale)
 import Model.User (User(..))
-import Network.HTTP.Affjax (AJAX)
 import Routing.Hash as Routing
 
 
-type AppConfig =
-  { stage :: String
-  , apiEndpoint :: String
-  }
-
-data Query a
-  = Initialize a
-  | HandleLogin LoginUI.Message a
-  | HandleHome HomePage.Message a
-  | Goto R.Location a
+data Action
+  = Initialize
+  | HandleLogin LoginUI.Message
+  | HandleHome HomePage.Message
 
 type State =
   { appConfig :: AppConfig
@@ -49,51 +33,45 @@ type State =
 
 type Input = AppConfig
 
+data Query a
+  = Goto R.Location a
+
 type Message = Void
 
-type ChildQuery
-  = NoticeUI.Query
-    <\/> LoginUI.Query
-    <\/> HomePage.Query
-    <\/> Const Void
+type ChildSlots =
+  ( notice :: H.Slot NoticeUI.Query NoticeUI.Message Unit
+  , login :: H.Slot (Const Void) LoginUI.Message Unit
+  , home :: H.Slot (Const Void) HomePage.Message Unit
+  )
 
-type ChildSlot
-  = NoticeUI.Slot
-    \/ LoginUI.Slot
-    \/ HomePage.Slot
-    \/ Void
-
-cpNotice :: CP.ChildPath NoticeUI.Query ChildQuery NoticeUI.Slot ChildSlot
-cpNotice = CP.cp1
-
-cpLogin :: CP.ChildPath LoginUI.Query ChildQuery LoginUI.Slot ChildSlot
-cpLogin = CP.cp2
-
-cpHome :: CP.ChildPath HomePage.Query ChildQuery HomePage.Slot ChildSlot
-cpHome = CP.cp3
-
-type Eff_ eff = Aff (ajax :: AJAX, dom :: DOM, now :: NOW, storage :: STORAGE | eff)
-
-ui :: forall eff. H.Component HH.HTML Query Input Message (Eff_ eff)
+ui ::
+  forall m.
+  MonadAff m =>
+  H.Component HH.HTML Query Input Message m
 ui =
-  H.lifecycleParentComponent
-    { initialState
-    , render
-    , eval
-    , receiver: const Nothing
-    , initializer: Just $ H.action Initialize
-    , finalizer: Nothing
+  H.mkComponent
+  { initialState
+  , render
+  , eval: H.mkEval $ H.defaultEval
+    { handleAction = handleAction
+    , handleQuery = handleQuery
+    , initialize = Just Initialize
     }
+  }
+
   where
     initialState appConfig@({ apiEndpoint }) =
       { appConfig
       , apiClient: Api.makeClient apiEndpoint
-      , locale: Locale (Just (LocaleName "GMT")) (Minutes 0.0)
+      , locale: Locale (Just "GMT") (Minutes 0.0)
       , location: R.Home
       }
 
 
-render :: forall eff. State -> H.ParentHTML Query ChildQuery ChildSlot (Eff_ eff)
+render ::
+  forall m.
+  MonadAff m =>
+  State -> H.ComponentHTML Action ChildSlots m
 render state =
   HH.div_
   [
@@ -109,11 +87,10 @@ render state =
     , renderUserName
     , renderLoginButton
     ]
-  , HH.slot' cpNotice NoticeUI.Slot NoticeUI.ui unit $ const Nothing
+  , HH.slot (SProxy :: _ "notice") unit NoticeUI.ui unit $ const Nothing
   , HH.main
     [ HP.class_ $ H.ClassName "container mt-2 mb-5" ]
-    [
-      renderPage state.location
+    [ renderPage state.location
     ]
   ]
 
@@ -158,55 +135,60 @@ render state =
 
     renderPage = case _ of
       R.Login ->
-        HH.slot' cpLogin LoginUI.Slot LoginUI.ui client $ HE.input HandleLogin
+        -- HH.slot' cpLogin LoginUI.Slot LoginUI.ui client $ HE.input HandleLogin
+        HH.slot (SProxy :: _ "login") unit LoginUI.ui client $ Just <<< HandleLogin
 
       R.Home ->
         withAuthentication
-        $ HH.slot' cpHome HomePage.Slot HomePage.ui { client, locale } $ HE.input HandleHome
+        -- $ HH.slot' cpHome HomePage.Slot HomePage.ui { client, locale } $ HE.input HandleHome
+        $ HH.slot (SProxy :: _ "home") unit HomePage.ui { client, locale } $ Just <<< HandleHome
 
     withAuthentication html =
       if Api.isAuthenticated client
       then html
-      else
-        HH.slot' cpLogin LoginUI.Slot LoginUI.ui client $ HE.input HandleLogin
+      else HH.slot (SProxy :: _ "login") unit LoginUI.ui client $ Just <<< HandleLogin
 
-eval :: forall eff. Query ~> H.ParentDSL State Query ChildQuery ChildSlot Message (Eff_ eff)
-eval = case _ of
-  Initialize next -> do
-    locale <- H.liftEff Now.locale
-    H.modify _{ locale = locale }
 
-    hash <- H.liftEff $ Routing.getHash
+handleAction ::
+  forall m.
+  MonadEffect m =>
+  MonadAff m =>
+  Action -> H.HalogenM State Action ChildSlots Void m Unit
+handleAction = case _ of
+  Initialize -> do
+    locale <- liftEffect getLocale
+    H.modify_ _{ locale = locale }
+
+    hash <- liftEffect Routing.getHash
     when (String.null hash) $
-      H.liftEff $ Routing.setHash "/"
+      liftEffect $ Routing.setHash "/"
 
-    pure next
-
-  HandleLogin (LoginUI.Authenticated client) next -> do
-    H.modify _{ apiClient = client }
+  HandleLogin (LoginUI.Authenticated client) -> do
+    H.modify_ _{ apiClient = client }
     postInfo "Authenticated."
-    pure next
 
-  HandleLogin (LoginUI.Unauthenticated client) next -> do
-    H.modify _{ apiClient = client }
+  HandleLogin (LoginUI.Unauthenticated client) -> do
+    H.modify_ _{ apiClient = client }
     postInfo "Unauthenticated."
-    pure next
 
-  HandleLogin (LoginUI.Failed client _ s) next -> do
-    H.modify _{ apiClient = client }
+  HandleLogin (LoginUI.Failed client _ s) -> do
+    H.modify_ _{ apiClient = client }
     postAlert s
-    pure next
 
-  HandleHome (HomePage.Failed s) next -> do
+  HandleHome (HomePage.Failed s) -> do
     postAlert s
-    pure next
-
-  Goto loc next -> do
-    H.modify _{ location = loc }
-    pure next
 
   where
     postNotice notice =
-      void $ H.query' cpNotice NoticeUI.Slot $ H.action $ NoticeUI.Post notice
+      void $ H.query (SProxy :: SProxy "notice") unit $ H.tell $ NoticeUI.Post notice
     postInfo s = postNotice $ NoticeUI.Info s
     postAlert s = postNotice $ NoticeUI.Alert s
+
+
+handleQuery ::
+  forall m a.
+  Query a -> H.HalogenM State Action ChildSlots Message m (Maybe a)
+handleQuery = case _ of
+  Goto loc next -> do
+    H.modify_ _{ location = loc }
+    pure $ Just next

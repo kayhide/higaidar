@@ -1,48 +1,35 @@
 module Component.Admin.PestListPage where
 
-import Prelude
+import AppPrelude
 
 import Api as Api
 import Api.Pests as Pests
 import Component.HTML.LoadingIndicator as LoadingIndicator
 import Component.PopulateUI as PopulateUI
 import Component.Util as Util
-import Control.Monad.Aff (Aff, attempt)
-import Control.Monad.Aff.Class (class MonadAff)
 import Data.Array ((!!))
 import Data.Array as Array
-import Data.Const (Const)
-import Data.DateTime.Locale (Locale)
-import Data.Either (Either(Left, Right), hush)
 import Data.Lens (Lens, modifying, view)
 import Data.Lens.Record (prop)
-import Data.Maybe (Maybe(Nothing, Just), maybe)
 import Data.String (Pattern(..))
 import Data.String as String
-import Data.Symbol (SProxy(..))
+import Effect.Aff.Class (class MonadAff)
 import Halogen as H
-import Halogen.Component.ChildPath as CP
-import Halogen.Data.Prism (type (<\/>), type (\/))
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import I18n.Ja as Ja
+import Model.DateTime (Locale)
 import Model.Pest (Pest(..), PestEntity(..), PestId)
 import Model.Pest as Pest
-import Network.HTTP.Affjax (AJAX)
 
 
-data Slot = Slot
-derive instance eqSlot :: Eq Slot
-derive instance ordSlot :: Ord Slot
-
-
-data Query a
-  = Initialize a
-  | SetLocale Locale a
-  | Reload a
-  | Destroy PestId a
-  | HandlePopulate (PopulateUI.Message Pest) a
+data Action
+  = Initialize
+  | SetLocale Locale
+  | Reload
+  | Destroy PestId
+  | HandlePopulate (PopulateUI.Message Pest)
 
 type State =
   { items :: Array Pest
@@ -64,44 +51,43 @@ type Input =
   , locale :: Locale
   }
 
+type Query = Const Void
+
 data Message
   = Failed String
 
-type ChildQuery
-  = PopulateUI.Query
-    <\/> Const Void
+type ChildSlots =
+  ( populate :: H.Slot (Const Void) (PopulateUI.Message Pest) Unit
+  )
 
-type ChildSlot
-  = PopulateUI.Slot
-    \/ Void
-
-cpPopulate :: CP.ChildPath PopulateUI.Query ChildQuery PopulateUI.Slot ChildSlot
-cpPopulate = CP.cp1
-
-type Eff_ eff = Aff (ajax :: AJAX | eff)
-
-ui :: forall eff. H.Component HH.HTML Query Input Message (Eff_ eff)
+ui ::
+  forall m.
+  MonadAff m =>
+  H.Component HH.HTML Query Input Message m
 ui =
-  H.lifecycleParentComponent
-    { initialState: initialState
-    , render
-    , eval
-    , receiver: const Nothing
-    , initializer: Just $ H.action Initialize
-    , finalizer: Nothing
+  H.mkComponent
+  { initialState
+  , render
+  , eval: H.mkEval $ H.defaultEval
+    { handleAction = handleAction
+    , initialize = Just Reload
     }
+  }
 
-initialState :: Input -> State
-initialState { client, locale } =
-    { items: []
-    , client
-    , locale
-    , busy: false
-    , populating: ""
-    , invalids: []
-    }
+  where
+    initialState { client, locale } =
+      { items: []
+      , client
+      , locale
+      , busy: false
+      , populating: ""
+      , invalids: []
+      }
 
-render :: forall eff. State -> H.ParentHTML Query ChildQuery ChildSlot (Eff_ eff)
+render ::
+  forall m.
+  MonadAff m =>
+  State -> H.ComponentHTML Action ChildSlots m
 render state =
   HH.div_
   [
@@ -114,7 +100,7 @@ render state =
       HH.div_
       $ renderItem <$> state.items
     ]
-  , HH.slot' cpPopulate PopulateUI.Slot PopulateUI.ui populateInput $ HE.input HandlePopulate
+  , HH.slot (SProxy :: _ "populate") unit PopulateUI.ui populateInput $ Just <<< HandlePopulate
   ]
 
   where
@@ -134,36 +120,37 @@ render state =
         ]
       , HH.button
         [ HP.class_ $ H.ClassName "btn btn-secondary btn-outline"
-        , HE.onClick $ HE.input_ $ Destroy id
+        , HE.onClick $ const $ Just $ Destroy id
         ]
         [
           HH.i [ HP.class_ $ H.ClassName "fa fa-times" ] []
         ]
       ]
 
-eval :: forall eff. Query ~> H.ParentDSL State Query ChildQuery ChildSlot Message (Eff_ eff)
-eval = case _ of
-  Initialize next -> do
-    eval $ Reload next
 
-  SetLocale locale next -> do
-    H.modify _{ locale = locale }
-    pure next
+handleAction ::
+  forall m.
+  MonadAff m =>
+  Action -> H.HalogenM State Action ChildSlots Message m Unit
+handleAction = case _ of
+  Initialize -> do
+    handleAction Reload
 
-  Reload next -> do
+  SetLocale locale -> do
+    H.modify_ _{ locale = locale }
+
+  Reload -> do
     Util.whenNotBusy_ do
       cli <- H.gets _.client
       res <- H.liftAff $ attempt $ Pests.index cli
 
       case res of
         Right items ->
-          H.modify _{ items = items }
+          H.modify_ _{ items = items }
         Left _ ->
           H.raise $ Failed "Failed to access api."
 
-    pure next
-
-  Destroy pestId next -> do
+  Destroy pestId -> do
     Util.whenNotBusy_ do
       cli <- H.gets _.client
       res <- H.liftAff $ attempt $ Pests.destroy cli pestId
@@ -171,22 +158,18 @@ eval = case _ of
       case res of
         Right _ -> do
           items <- Array.filter ((pestId /= _) <<< view Pest._id) <$> H.gets _.items
-          H.modify _{ items = items }
+          H.modify_ _{ items = items }
         Left _ ->
           H.raise $ Failed "Failed to delete pest."
 
-    pure next
-
-  HandlePopulate (PopulateUI.Created pest) next -> do
+  HandlePopulate (PopulateUI.Created pest) -> do
     modifying _items $ flip Array.snoc pest
-    pure next
 
-  HandlePopulate (PopulateUI.Failed _) next -> do
+  HandlePopulate (PopulateUI.Failed _) -> do
     H.raise $ Failed "Failed to create some pests."
-    pure next
 
 
-creater :: forall eff m. MonadAff (ajax :: AJAX | eff) m => Api.Client -> String -> m (Maybe Pest)
+creater :: forall m. MonadAff m => Api.Client -> String -> m (Maybe Pest)
 creater cli row =
   maybe (pure Nothing) (map hush <<< H.liftAff <<< attempt <<< Pests.create cli) entity
 
