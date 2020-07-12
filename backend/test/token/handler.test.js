@@ -1,5 +1,3 @@
-'use strict';
-
 const _ = require('lodash');
 const co = require('co');
 const promisify = require('util.promisify');
@@ -11,19 +9,17 @@ const helper = require('test/test-helper');
 const fixture = require('test/fixture');
 const factory = require('test/factory');
 
-
 describe('token', () => {
   let User;
-  before(() => co(function *(){
+  before(() => co(function* () {
     const model = proxyquire('app/model', helper.stub);
     const m = yield model.with(_.identity);
     User = m.User;
   }));
 
-  afterEach(() => co(function *(){
+  afterEach(() => co(function* () {
     yield User.destroy({ where: {} });
   }));
-
 
   describe('#create', () => {
     let event;
@@ -31,7 +27,7 @@ describe('token', () => {
     let user;
     const attrs = { code: '1703', tel: '03-3624-4700' };
 
-    beforeEach(() => co(function *() {
+    beforeEach(() => co(function* () {
       const handler = proxyquire('app/token/handler', helper.stub);
       handle = promisify(handler.create.bind(handler));
 
@@ -41,20 +37,18 @@ describe('token', () => {
     }));
 
     context('with valid attrs', () => {
-      it('returns a token with user', () => {
-        return co(function *() {
-          const res = yield handle(event, {});
-          assert(res.statusCode === 200);
+      it('returns a token with user', () => co(function* () {
+        const res = yield handle(event, {});
+        assert(res.statusCode === 200);
 
-          const body = JSON.parse(res.body);
-          const user_ = body.user;
-          assert(helper.isEqualModel(user_, user));
+        const body = JSON.parse(res.body);
+        const user_ = body.user;
+        assert(helper.isEqualModel(user_, user));
 
-          const token = body.token;
-          const decoded = jwt.verify(token, process.env.JWT_SECRET);
-          assert(helper.isEqualModel(decoded.user, user));
-        });
-      });
+        const { token } = body;
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        assert(helper.isEqualModel(decoded.user, user));
+      }));
     });
 
     context('with wrong attrs', () => {
@@ -62,12 +56,10 @@ describe('token', () => {
         event.body = JSON.stringify({ code: '9999', tel: '00-0000-0000' });
       });
 
-      it('returns 401', () => {
-        return co(function *() {
-          const res = yield handle(event, {});
-          assert(res.statusCode === 401);
-        });
-      });
+      it('returns 401', () => co(function* () {
+        const res = yield handle(event, {});
+        assert(res.statusCode === 401);
+      }));
     });
 
     context('with partially correct attrs', () => {
@@ -75,12 +67,10 @@ describe('token', () => {
         event.body = JSON.stringify({ code: '1703' });
       });
 
-      it('returns 401', () => {
-        return co(function *() {
-          const res = yield handle(event, {});
-          assert(res.statusCode === 401);
-        });
-      });
+      it('returns 401', () => co(function* () {
+        const res = yield handle(event, {});
+        assert(res.statusCode === 401);
+      }));
     });
   });
 
@@ -90,7 +80,7 @@ describe('token', () => {
     let user;
     let token;
 
-    beforeEach(() => co(function *() {
+    beforeEach(() => co(function* () {
       const handler = proxyquire('app/token/handler', helper.stub);
       handle = promisify(handler.authorize.bind(handler));
 
@@ -99,113 +89,109 @@ describe('token', () => {
     }));
 
     context('with valid token of non-admin user', () => {
-      beforeEach(() => co(function *() {
+      beforeEach(() => co(function* () {
         user = yield factory.create(User);
         token = jwt.sign(
           { user: user.dataValues },
           process.env.JWT_SECRET,
-          { expiresIn: process.env.JWT_EXPIRES_IN }
-        )
+          { expiresIn: process.env.JWT_EXPIRES_IN },
+        );
         event.authorizationToken = `Bearer ${token}`;
       }));
 
-      it('generates policy', () => {
-        return co(function *() {
-          const res = yield handle(event, {});
-          const statements = res.policyDocument.Statement;
-          assert(statements.length === 3);
-          let i;
+      it('generates policy', () => co(function* () {
+        const res = yield handle(event, {});
+        const statements = res.policyDocument.Statement;
+        assert(statements.length === 3);
+        let i;
 
-          i = 0;
-          assert(statements[i].Action === 'execute-api:Invoke');
-          assert(statements[i].Effect === 'Allow');
-          assert(_.isEqual(statements[i].Resource, [
-            'arn:aws:execute-api:ap-northheast-1::api-id/test/GET/crops'
-          ]));
+        i = 0;
+        assert(statements[i].Action === 'execute-api:Invoke');
+        assert(statements[i].Effect === 'Allow');
+        assert(_.isEqual(statements[i].Resource, [
+          'arn:aws:execute-api:ap-northheast-1::api-id/test/GET/crops',
+        ]));
 
-          i = 1;
-          assert(statements[i].Action === 'execute-api:Invoke');
-          assert(statements[i].Effect === 'Allow');
-          assert(_.isEqual(statements[i].Resource, [
-            'arn:aws:execute-api:ap-northheast-1::api-id/test/GET/pests'
-          ]));
+        i = 1;
+        assert(statements[i].Action === 'execute-api:Invoke');
+        assert(statements[i].Effect === 'Allow');
+        assert(_.isEqual(statements[i].Resource, [
+          'arn:aws:execute-api:ap-northheast-1::api-id/test/GET/pests',
+        ]));
 
-          i = 2;
-          assert(statements[i].Action === 'execute-api:Invoke');
-          assert(statements[i].Effect === 'Allow');
-          assert(_.isEqual(statements[i].Resource, [
-            'arn:aws:execute-api:ap-northheast-1::api-id/test/*/my/*'
-          ]));
-        });
-      });
+        i = 2;
+        assert(statements[i].Action === 'execute-api:Invoke');
+        assert(statements[i].Effect === 'Allow');
+        assert(_.isEqual(statements[i].Resource, [
+          'arn:aws:execute-api:ap-northheast-1::api-id/test/*/my/*',
+        ]));
+      }));
     });
 
     context('with valid token of admin user', () => {
-      beforeEach(() => co(function *() {
+      beforeEach(() => co(function* () {
         user = yield factory.create(User, { is_admin: true });
         token = jwt.sign(
           { user: user.dataValues },
           process.env.JWT_SECRET,
-          { expiresIn: process.env.JWT_EXPIRES_IN }
-        )
+          { expiresIn: process.env.JWT_EXPIRES_IN },
+        );
         event.authorizationToken = `Bearer ${token}`;
       }));
 
-      it('generates policy', () => {
-        return co(function *() {
-          const res = yield handle(event, {});
-          const statements = res.policyDocument.Statement;
-          assert(statements.length === 5);
-          let i;
+      it('generates policy', () => co(function* () {
+        const res = yield handle(event, {});
+        const statements = res.policyDocument.Statement;
+        assert(statements.length === 5);
+        let i;
 
-          i = 0;
-          assert(statements[i].Action === 'execute-api:Invoke');
-          assert(statements[i].Effect === 'Allow');
-          assert(_.isEqual(statements[i].Resource, [
-            'arn:aws:execute-api:ap-northheast-1::api-id/test/*/users',
-            'arn:aws:execute-api:ap-northheast-1::api-id/test/*/users/*'
-          ]));
+        i = 0;
+        assert(statements[i].Action === 'execute-api:Invoke');
+        assert(statements[i].Effect === 'Allow');
+        assert(_.isEqual(statements[i].Resource, [
+          'arn:aws:execute-api:ap-northheast-1::api-id/test/*/users',
+          'arn:aws:execute-api:ap-northheast-1::api-id/test/*/users/*',
+        ]));
 
-          i = 1;
-          assert(statements[i].Action === 'execute-api:Invoke');
-          assert(statements[i].Effect === 'Allow');
-          assert(_.isEqual(statements[i].Resource, [
-            'arn:aws:execute-api:ap-northheast-1::api-id/test/*/photos',
-            'arn:aws:execute-api:ap-northheast-1::api-id/test/*/photos/*'
-          ]));
+        i = 1;
+        assert(statements[i].Action === 'execute-api:Invoke');
+        assert(statements[i].Effect === 'Allow');
+        assert(_.isEqual(statements[i].Resource, [
+          'arn:aws:execute-api:ap-northheast-1::api-id/test/*/photos',
+          'arn:aws:execute-api:ap-northheast-1::api-id/test/*/photos/*',
+        ]));
 
-          i = 2;
-          assert(statements[i].Action === 'execute-api:Invoke');
-          assert(statements[i].Effect === 'Allow');
-          assert(_.isEqual(statements[i].Resource, [
-            'arn:aws:execute-api:ap-northheast-1::api-id/test/*/crops',
-            'arn:aws:execute-api:ap-northheast-1::api-id/test/*/crops/*'
-          ]));
+        i = 2;
+        assert(statements[i].Action === 'execute-api:Invoke');
+        assert(statements[i].Effect === 'Allow');
+        assert(_.isEqual(statements[i].Resource, [
+          'arn:aws:execute-api:ap-northheast-1::api-id/test/*/crops',
+          'arn:aws:execute-api:ap-northheast-1::api-id/test/*/crops/*',
+        ]));
 
-          i = 3;
-          assert(statements[i].Action === 'execute-api:Invoke');
-          assert(statements[i].Effect === 'Allow');
-          assert(_.isEqual(statements[i].Resource, [
-            'arn:aws:execute-api:ap-northheast-1::api-id/test/*/pests',
-            'arn:aws:execute-api:ap-northheast-1::api-id/test/*/pests/*'
-          ]));
+        i = 3;
+        assert(statements[i].Action === 'execute-api:Invoke');
+        assert(statements[i].Effect === 'Allow');
+        assert(_.isEqual(statements[i].Resource, [
+          'arn:aws:execute-api:ap-northheast-1::api-id/test/*/pests',
+          'arn:aws:execute-api:ap-northheast-1::api-id/test/*/pests/*',
+        ]));
 
-          i = 4;
-          assert(statements[i].Action === 'execute-api:Invoke');
-          assert(statements[i].Effect === 'Allow');
-          assert(_.isEqual(statements[i].Resource, [
-            'arn:aws:execute-api:ap-northheast-1::api-id/test/*/my/*'
-          ]));
-        });
-      });
+        i = 4;
+        assert(statements[i].Action === 'execute-api:Invoke');
+        assert(statements[i].Effect === 'Allow');
+        assert(_.isEqual(statements[i].Resource, [
+          'arn:aws:execute-api:ap-northheast-1::api-id/test/*/my/*',
+        ]));
+      }));
     });
 
     context('with invalid token', () => {
       it('unauthorizes', () => {
         event.authorizationToken = 'invalid';
-        return co(function *() {
+        return co(function* () {
           yield handle(event, {});
-        }).then(() => assert(false), err => {
+        }).then(() => assert(false), (err) => {
           assert(err === 'Unauthorized');
         });
       });
@@ -214,9 +200,9 @@ describe('token', () => {
     context('with malformed token', () => {
       it('unauthorizes', () => {
         event.authorizationToken = token;
-        return co(function *() {
+        return co(function* () {
           yield handle(event, {});
-        }).then(() => assert(false), err => {
+        }).then(() => assert(false), (err) => {
           assert(err === 'Unauthorized');
         });
       });

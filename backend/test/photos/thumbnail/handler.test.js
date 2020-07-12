@@ -1,5 +1,3 @@
-'use strict';
-
 const _ = require('lodash');
 const fs = require('fs');
 const co = require('co');
@@ -14,20 +12,19 @@ const fixture = require('test/fixture');
 const factory = require('test/factory');
 const Localstack = require('lib/localstack');
 
-
 const s3 = new Localstack.S3();
 
 describe('photos/thumbnail', () => {
   let User;
   let Photo;
-  before(() => co(function *(){
+  before(() => co(function* () {
     const model = proxyquire('app/model', helper.stub);
     const m = yield model.with(_.identity);
     User = m.User;
     Photo = m.Photo;
   }));
 
-  afterEach(() => co(function *(){
+  afterEach(() => co(function* () {
     yield Photo.destroy({ where: {} });
     yield User.destroy({ where: {} });
   }));
@@ -39,10 +36,10 @@ describe('photos/thumbnail', () => {
 
   let user;
   let event;
-  beforeEach(() => co(function *(){
+  beforeEach(() => co(function* () {
     user = yield factory.create(User);
     event = {
-      body: '{}'
+      body: '{}',
     };
   }));
 
@@ -54,7 +51,7 @@ describe('photos/thumbnail', () => {
     let handle;
     let photo;
     let key;
-    beforeEach(() => co(function *() {
+    beforeEach(() => co(function* () {
       handle = promisify(handler.create.bind(handler));
 
       key = `${user.id}/japan/tokyo/nyappori/${file}`;
@@ -62,7 +59,7 @@ describe('photos/thumbnail', () => {
         user_id: user.id,
         key,
         original_url: `https://higaidar-test-photos.s3.ap-northeast-1.amazonaws.com/${key}`,
-        thumbnail_url: `https://higaidar-test-photos-thumbnail.s3.ap-northeast-1.amazonaws.com/${key}`
+        thumbnail_url: `https://higaidar-test-photos-thumbnail.s3.ap-northeast-1.amazonaws.com/${key}`,
       });
       event.pathParameters = { id: photo.id };
 
@@ -70,14 +67,12 @@ describe('photos/thumbnail', () => {
       yield helper.unsetS3File(s3, dstBucket, key);
     }));
 
-    it('creates thumbnail on s3', () => {
-      return co(function *() {
-        const org = yield helper.exists(s3, dstBucket, key);
-        assert(!org);
-        yield handle(event, {});
-        const cur = yield helper.exists(s3, dstBucket, key);
-        assert(cur);
-      });
-    });
+    it('creates thumbnail on s3', () => co(function* () {
+      const org = yield helper.exists(s3, dstBucket, key);
+      assert(!org);
+      yield handle(event, {});
+      const cur = yield helper.exists(s3, dstBucket, key);
+      assert(cur);
+    }));
   });
 });

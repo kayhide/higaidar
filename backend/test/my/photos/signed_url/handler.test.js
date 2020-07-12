@@ -1,5 +1,3 @@
-'use strict';
-
 const _ = require('lodash');
 const co = require('co');
 const promisify = require('util.promisify');
@@ -7,17 +5,16 @@ const assert = require('power-assert');
 const sinon = require('sinon');
 const proxyquire = require('proxyquire');
 
-const URL = require('url').URL;
+const { URL } = require('url');
 
 const helper = require('test/test-helper');
 const fixture = require('test/fixture');
 const factory = require('test/factory');
 
-
 describe('my/photos/signed_url', () => {
   let User;
   let Photo;
-  before(() => co(function *(){
+  before(() => co(function* () {
     const model = proxyquire('app/model', helper.stub);
     const m = yield model.with(_.identity);
     User = m.User;
@@ -31,23 +28,22 @@ describe('my/photos/signed_url', () => {
 
   let user;
   let event;
-  beforeEach(() => co(function *(){
+  beforeEach(() => co(function* () {
     user = yield factory.create(User);
     event = {
       requestContext: {
         authorizer: {
-          userId: user.id.toString()
-        }
+          userId: user.id.toString(),
+        },
       },
-      body: '{}'
+      body: '{}',
     };
   }));
 
-  afterEach(() => co(function *(){
+  afterEach(() => co(function* () {
     yield Photo.destroy({ where: {} });
     yield User.destroy({ where: {} });
   }));
-
 
   describe('#create', () => {
     let handle;
@@ -57,28 +53,26 @@ describe('my/photos/signed_url', () => {
 
     context('with valid attrs', () => {
       const attrs = {
-        filename: 'image.jpg'
+        filename: 'image.jpg',
       };
 
       beforeEach(() => {
         event.body = JSON.stringify(attrs);
       });
 
-      it('returns signed url', () => {
-        return co(function *() {
-          const res = yield handle(event, {});
-          assert(res.statusCode === 200);
+      it('returns signed url', () => co(function* () {
+        const res = yield handle(event, {});
+        assert(res.statusCode === 200);
 
-          const body = JSON.parse(res.body);
-          const url = new URL(body.url);
-          assert(url.host === `localhost:${process.env.S3_PORT}`);
-          assert(url.pathname.match(new RegExp(`^/higaidar-test-photos/${user.id}/.*/image\\.jpg$`)));
+        const body = JSON.parse(res.body);
+        const url = new URL(body.url);
+        assert(url.host === `localhost:${process.env.S3_PORT}`);
+        assert(url.pathname.match(new RegExp(`^/higaidar-test-photos/${user.id}/.*/image\\.jpg$`)));
 
-          assert(url.searchParams.get('AWSAccessKeyId') === '');
-          assert(url.searchParams.get('Expires').match(/^\d+$/));
-          assert(url.searchParams.get('Signature').match(/\w+=$/));
-        });
-      });
+        assert(url.searchParams.get('AWSAccessKeyId') === '');
+        assert(url.searchParams.get('Expires').match(/^\d+$/));
+        assert(url.searchParams.get('Signature').match(/\w+=$/));
+      }));
     });
   });
 });

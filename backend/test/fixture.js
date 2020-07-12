@@ -1,5 +1,3 @@
-'use strict';
-
 const fs = require('fs');
 const path = require('path');
 const co = require('co');
@@ -11,5 +9,5 @@ module.exports = {
 
   join(name) {
     return path.join(__dirname, 'fixtures', name);
-  }
-}
+  },
+};

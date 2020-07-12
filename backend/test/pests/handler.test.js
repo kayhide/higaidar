@@ -1,5 +1,3 @@
-'use strict';
-
 const _ = require('lodash');
 const co = require('co');
 const promisify = require('util.promisify');
@@ -11,10 +9,9 @@ const helper = require('test/test-helper');
 const fixture = require('test/fixture');
 const factory = require('test/factory');
 
-
 describe('pests', () => {
   let Pest;
-  before(() => co(function *(){
+  before(() => co(function* () {
     const model = proxyquire('app/model', helper.stub);
     const m = yield model.with(_.identity);
     Pest = m.Pest;
@@ -26,16 +23,15 @@ describe('pests', () => {
   });
 
   let event;
-  beforeEach(() => co(function *(){
+  beforeEach(() => co(function* () {
     event = {
-      body: '{}'
+      body: '{}',
     };
   }));
 
-  afterEach(() => co(function *(){
+  afterEach(() => co(function* () {
     yield Pest.destroy({ where: {} });
   }));
-
 
   describe('#index', () => {
     let handle;
@@ -44,71 +40,63 @@ describe('pests', () => {
     });
 
     context('without params', () => {
-      it('returns pests ordered by id asc', () => {
-        return co(function *() {
-          const pests = yield factory.createList(Pest, 2);
-          const n = yield Pest.count();
-          assert(n === 2);
+      it('returns pests ordered by id asc', () => co(function* () {
+        const pests = yield factory.createList(Pest, 2);
+        const n = yield Pest.count();
+        assert(n === 2);
 
-          const res = yield handle(event, {})
-          assert(res.statusCode === 200);
+        const res = yield handle(event, {});
+        assert(res.statusCode === 200);
 
-          const body = JSON.parse(res.body);
-          assert(helper.isEqualModel(body[0], pests[0]));
-          assert(helper.isEqualModel(body[1], pests[1]));
-        });
-      });
+        const body = JSON.parse(res.body);
+        assert(helper.isEqualModel(body[0], pests[0]));
+        assert(helper.isEqualModel(body[1], pests[1]));
+      }));
 
-      it('returns content range', () => {
-        return co(function *() {
-          const pests = yield factory.createList(Pest, 7);
-          const res = yield handle(event, {})
-          assert(res.headers['Content-Range'] === '0-6/7');
-        });
-      });
+      it('returns content range', () => co(function* () {
+        const pests = yield factory.createList(Pest, 7);
+        const res = yield handle(event, {});
+        assert(res.headers['Content-Range'] === '0-6/7');
+      }));
     });
 
     context('with paging params', () => {
-      it('offsets and limits', () => {
-        return co(function *() {
-          event.queryStringParameters = {
-            offset: '2',
-            limit: '3'
-          };
-          const pests = yield factory.createList(Pest, 7);
-          const res = yield handle(event, {})
-          assert(res.headers['Content-Range'] === '2-4/7');
+      it('offsets and limits', () => co(function* () {
+        event.queryStringParameters = {
+          offset: '2',
+          limit: '3',
+        };
+        const pests = yield factory.createList(Pest, 7);
+        const res = yield handle(event, {});
+        assert(res.headers['Content-Range'] === '2-4/7');
 
-          const body = JSON.parse(res.body);
-          assert(body.length === 3);
-          assert(helper.isEqualModel(body[0], pests[2]));
-          assert(helper.isEqualModel(body[2], pests[4]));
-        });
-      });
+        const body = JSON.parse(res.body);
+        assert(body.length === 3);
+        assert(helper.isEqualModel(body[0], pests[2]));
+        assert(helper.isEqualModel(body[2], pests[4]));
+      }));
     });
 
     context('with filtering params', () => {
-      it('filters by crop', () => {
-        return co(function *() {
-          const crop = "Mikan";
-          const pests = yield factory.createList(Pest, 3, { crop });
+      it('filters by crop', () => co(function* () {
+        const crop = 'Mikan';
+        const pests = yield factory.createList(Pest, 3, { crop });
 
-          yield factory.createList(Pest, 2);
+        yield factory.createList(Pest, 2);
 
-          event.queryStringParameters = {
-            crop: `eq(${crop})`
-          };
+        event.queryStringParameters = {
+          crop: `eq(${crop})`,
+        };
 
-          const res = yield handle(event, {})
-          assert(res.headers['Content-Range'] === '0-2/3');
+        const res = yield handle(event, {});
+        assert(res.headers['Content-Range'] === '0-2/3');
 
-          const body = JSON.parse(res.body);
-          assert(body.length === 3);
-          assert(helper.isEqualModel(body[0], pests[0]));
-          assert(helper.isEqualModel(body[1], pests[1]));
-          assert(helper.isEqualModel(body[2], pests[2]));
-        });
-      });
+        const body = JSON.parse(res.body);
+        assert(body.length === 3);
+        assert(helper.isEqualModel(body[0], pests[0]));
+        assert(helper.isEqualModel(body[1], pests[1]));
+        assert(helper.isEqualModel(body[2], pests[2]));
+      }));
     });
   });
 
@@ -121,42 +109,38 @@ describe('pests', () => {
     context('with valid attrs', () => {
       const attrs = {
         label: 'New Pest',
-        crop: 'Mikan'
+        crop: 'Mikan',
       };
 
       beforeEach(() => {
         event.body = JSON.stringify(attrs);
       });
 
-      it('creates a new pest', () => {
-        return co(function *() {
-          const org = yield Pest.count();
-          yield handle(event, {});
-          const cur = yield Pest.count();
-          assert(org === 0);
-          assert(cur === 1);
+      it('creates a new pest', () => co(function* () {
+        const org = yield Pest.count();
+        yield handle(event, {});
+        const cur = yield Pest.count();
+        assert(org === 0);
+        assert(cur === 1);
 
-          const pest = yield Pest.findOne();
-          assert(_.isMatch(pest.dataValues, attrs));
-        });
-      });
+        const pest = yield Pest.findOne();
+        assert(_.isMatch(pest.dataValues, attrs));
+      }));
 
-      it('returns attributes of the new pest', () => {
-        return co(function *() {
-          const res = yield handle(event, {});
-          assert(res.statusCode === 200);
+      it('returns attributes of the new pest', () => co(function* () {
+        const res = yield handle(event, {});
+        assert(res.statusCode === 200);
 
-          const body = JSON.parse(res.body);
-          assert(_.isMatch(body, attrs));
-        });
-      });
+        const body = JSON.parse(res.body);
+        assert(_.isMatch(body, attrs));
+      }));
     });
   });
 
   describe('#destroy', () => {
     let handle;
     let pest;
-    beforeEach(() => co(function *() {
+    beforeEach(() => co(function* () {
       handle = promisify(handler.destroy.bind(handler));
 
       pest = yield factory.create(Pest);
@@ -165,22 +149,18 @@ describe('pests', () => {
     }));
 
     context('with valid id', () => {
-      it('deletes the pest', () => {
-        return co(function *() {
-          const org = yield Pest.count();
-          yield handle(event, {});
-          const cur = yield Pest.count();
-          assert(org === 1);
-          assert(cur === 0);
-        });
-      });
+      it('deletes the pest', () => co(function* () {
+        const org = yield Pest.count();
+        yield handle(event, {});
+        const cur = yield Pest.count();
+        assert(org === 1);
+        assert(cur === 0);
+      }));
 
-      it('returns 204', () => {
-        return co(function *() {
-          const res = yield handle(event, {});
-          assert(res.statusCode === 204);
-        });
-      });
+      it('returns 204', () => co(function* () {
+        const res = yield handle(event, {});
+        assert(res.statusCode === 204);
+      }));
     });
 
     context('with invalid id', () => {
@@ -188,12 +168,10 @@ describe('pests', () => {
         event.pathParameters = { id: 0 };
       });
 
-      it('returns 404', () => {
-        return co(function *() {
-          const res = yield handle(event, {});
-          assert(res.statusCode === 404);
-        });
-      });
+      it('returns 404', () => co(function* () {
+        const res = yield handle(event, {});
+        assert(res.statusCode === 404);
+      }));
     });
   });
 });

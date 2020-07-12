@@ -1,5 +1,3 @@
-'use strict';
-
 const _ = require('lodash');
 const co = require('co');
 const promisify = require('util.promisify');
@@ -7,17 +5,16 @@ const assert = require('power-assert');
 const sinon = require('sinon');
 const proxyquire = require('proxyquire');
 
-const URL = require('url').URL;
+const { URL } = require('url');
 
 const helper = require('test/test-helper');
 const fixture = require('test/fixture');
 const factory = require('test/factory');
 
-
 describe('my/photos/presigned_post', () => {
   let User;
   let Photo;
-  before(() => co(function *(){
+  before(() => co(function* () {
     const model = proxyquire('app/model', helper.stub);
     const m = yield model.with(_.identity);
     User = m.User;
@@ -31,23 +28,22 @@ describe('my/photos/presigned_post', () => {
 
   let user;
   let event;
-  beforeEach(() => co(function *(){
+  beforeEach(() => co(function* () {
     user = yield factory.create(User);
     event = {
       requestContext: {
         authorizer: {
-          userId: user.id.toString()
-        }
+          userId: user.id.toString(),
+        },
       },
-      body: '{}'
+      body: '{}',
     };
   }));
 
-  afterEach(() => co(function *(){
+  afterEach(() => co(function* () {
     yield Photo.destroy({ where: {} });
     yield User.destroy({ where: {} });
   }));
-
 
   describe('#create', () => {
     let handle;
@@ -57,32 +53,30 @@ describe('my/photos/presigned_post', () => {
 
     context('with valid attrs', () => {
       const attrs = {
-        filename: 'image.jpg'
+        filename: 'image.jpg',
       };
 
       beforeEach(() => {
         event.body = JSON.stringify(attrs);
       });
 
-      it('returns presigned post attrs', () => {
-        return co(function *() {
-          const res = yield handle(event, {});
-          assert(res.statusCode === 200);
+      it('returns presigned post attrs', () => co(function* () {
+        const res = yield handle(event, {});
+        assert(res.statusCode === 200);
 
-          const body = JSON.parse(res.body);
-          assert(body.url === `http://localhost:${process.env.S3_PORT}/higaidar-test-photos`);
+        const body = JSON.parse(res.body);
+        assert(body.url === `http://localhost:${process.env.S3_PORT}/higaidar-test-photos`);
 
-          const fields = body.fields;
-          assert(_.keys(fields).length === 7);
-          assert(fields.key.match(new RegExp(`^${user.id}/.*/image\\.jpg$`)));
-          assert(fields.bucket ==='higaidar-test-photos');
-          assert(fields['X-Amz-Algorithm']);
-          assert(fields['X-Amz-Credential']);
-          assert(fields['X-Amz-Date']);
-          assert(fields['X-Amz-Signature']);
-          assert(fields.Policy);
-        });
-      });
+        const { fields } = body;
+        assert(_.keys(fields).length === 7);
+        assert(fields.key.match(new RegExp(`^${user.id}/.*/image\\.jpg$`)));
+        assert(fields.bucket === 'higaidar-test-photos');
+        assert(fields['X-Amz-Algorithm']);
+        assert(fields['X-Amz-Credential']);
+        assert(fields['X-Amz-Date']);
+        assert(fields['X-Amz-Signature']);
+        assert(fields.Policy);
+      }));
     });
   });
 });
