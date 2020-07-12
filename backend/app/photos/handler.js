@@ -85,7 +85,7 @@ module.exports.index = (event, context, callback) => {
   co(function* () {
     const params = parseParams(event);
     const { offset, limit } = params.pager({ offset: 0, limit: 50 });
-    const where = params.filter('user_id', 'pest');
+    const where = params.filter('user_id', 'crop', 'pest');
     const data = yield model.with((m) => co(function* () {
       return m.Photo.findAndCountAll({
         order: [['id', 'DESC']], offset, limit, where,

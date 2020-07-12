@@ -43,11 +43,12 @@ before((done) => {
   }).catch(done);
 });
 
-module.exports.stub = {
-
-  ...require('lib/connStub').stub,
-  ...require('lib/awsStub').stub,
-};
+/* eslint prefer-object-spread: "off" */
+module.exports.stub = Object.assign(
+  {},
+  require('lib/connStub').stub,
+  require('lib/awsStub').stub,
+);
 
 const comparablify = (x) => {
   const x_ = x.dataValues ? x.dataValues : x;

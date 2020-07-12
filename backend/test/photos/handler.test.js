@@ -191,6 +191,27 @@ describe('photos', () => {
         assert(helper.isEqualModel(body[2], photos_[2]));
       }));
 
+      it('filters by crop', () => co(function* () {
+        const crop = 'Mikan';
+        const photos = yield factory.createList(Photo, 3, { user_id: user.id, crop });
+        const photos_ = _.reverse(photos);
+
+        yield factory.createList(Photo, 2, { user_id: user.id });
+
+        event.queryStringParameters = {
+          crop: `eq(${crop})`,
+        };
+
+        const res = yield handle(event, {});
+        assert(res.headers['Content-Range'] === '0-2/3');
+
+        const body = JSON.parse(res.body);
+        assert(body.length === 3);
+        assert(helper.isEqualModel(body[0], photos_[0]));
+        assert(helper.isEqualModel(body[1], photos_[1]));
+        assert(helper.isEqualModel(body[2], photos_[2]));
+      }));
+
       it('filters by pest', () => co(function* () {
         const pest = 'Creutsfeldt Jakob';
         const photos = yield factory.createList(Photo, 3, { user_id: user.id, pest });
