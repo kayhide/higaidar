@@ -12,6 +12,11 @@ index cli = Api.get cli path
   where
     path = "/pests"
 
+filter :: Client -> Api.FilteringMap -> Aff (Array Pest)
+filter cli params = Api.get cli path
+  where
+    path = "/pests?" <> Api.buildQuery params
+
 find :: Client -> PestId -> Aff Pest
 find cli pestId = Api.get cli path
   where

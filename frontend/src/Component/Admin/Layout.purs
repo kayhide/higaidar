@@ -4,6 +4,7 @@ import AppPrelude
 
 import Api as Api
 import AppConfig (AppConfig)
+import Component.Admin.CropListPage as CropListPage
 import Component.Admin.PestListPage as PestListPage
 import Component.Admin.PhotoListPage as PhotoListPage
 import Component.Admin.Route as R
@@ -28,6 +29,7 @@ data Action
   | HandleUserList UserListPage.Message
   | HandleUserEdit UserEditPage.Message
   | HandlePhotoList PhotoListPage.Message
+  | HandleCropList CropListPage.Message
   | HandlePestList PestListPage.Message
 
 type State =
@@ -50,6 +52,7 @@ type ChildSlots =
   , userList :: H.Slot (Const Void) UserListPage.Message Unit
   , userEdit :: H.Slot (Const Void) UserEditPage.Message Unit
   , photoList :: H.Slot (Const Void) PhotoListPage.Message Unit
+  , cropList :: H.Slot (Const Void) CropListPage.Message Unit
   , pestList :: H.Slot (Const Void) PestListPage.Message Unit
   )
 
@@ -114,6 +117,7 @@ render state =
         [
           renderMenuItem R.UsersIndex Ja.user "users"
         , renderMenuItem R.PhotosIndex Ja.photo "picture-o"
+        , renderMenuItem R.CropsIndex Ja.crop "leaf"
         , renderMenuItem R.PestsIndex Ja.pest "bug"
         ]
       , renderUserName
@@ -211,6 +215,10 @@ render state =
         withAuthentication
         $ HH.slot (SProxy :: _ "photoList") unit PhotoListPage.ui { client, locale } $ Just <<< HandlePhotoList
 
+      R.CropsIndex ->
+        withAuthentication
+        $ HH.slot (SProxy :: _ "cropList") unit CropListPage.ui { client, locale } $ Just <<< HandleCropList
+
       R.PestsIndex ->
         withAuthentication
         $ HH.slot (SProxy :: _ "pestList") unit PestListPage.ui { client, locale } $ Just <<< HandlePestList
@@ -253,6 +261,9 @@ handleAction = case _ of
     postAlert s
 
   HandlePhotoList (PhotoListPage.Failed s) -> do
+    postAlert s
+
+  HandleCropList (CropListPage.Failed s) -> do
     postAlert s
 
   HandlePestList (PestListPage.Failed s) -> do

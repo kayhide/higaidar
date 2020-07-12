@@ -23,6 +23,7 @@ newtype Photo =
   , user_id :: UserId
   , original_url :: URL
   , thumbnail_url :: Maybe URL
+  , crop :: Maybe String
   , pest :: Maybe String
   , created_at :: DateTime
   , updated_at :: DateTime
@@ -74,13 +75,15 @@ instance decodeJsonPhoto :: DecodeJson Photo where
 
 
 toEntity :: Photo -> PhotoEntity
-toEntity (Photo { original_url, thumbnail_url, pest }) = PhotoEntity { original_url, thumbnail_url, pest }
+toEntity (Photo { original_url, thumbnail_url, crop, pest }) =
+  PhotoEntity { original_url, thumbnail_url, crop, pest }
 
 
 newtype PhotoEntity =
   PhotoEntity
   { original_url :: URL
   , thumbnail_url :: Maybe URL
+  , crop :: Maybe String
   , pest :: Maybe String
   }
 

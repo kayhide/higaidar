@@ -1,4 +1,4 @@
-module Model.Pest where
+module Model.Crop where
 
 import AppPrelude
 
@@ -13,46 +13,42 @@ import Model.DateTime (decodeDateTime, encodeDateTime)
 import Record as Record
 
 
-type PestId = Int
+type CropId = Int
 
-newtype Pest =
-  Pest
-  { id :: PestId
+newtype Crop =
+  Crop
+  { id :: CropId
   , label :: String
-  , crop :: Maybe String
   , created_at :: DateTime
   , updated_at :: DateTime
   }
 
-_id :: Lens' Pest PestId
+_id :: Lens' Crop CropId
 _id = _Newtype <<< prop (SProxy :: SProxy "id")
 
-_label :: Lens' Pest String
+_label :: Lens' Crop String
 _label = _Newtype <<< prop (SProxy :: SProxy "label")
 
-_crop :: Lens' Pest (Maybe String)
-_crop = _Newtype <<< prop (SProxy :: SProxy "crop")
-
-_created_at :: Lens' Pest DateTime
+_created_at :: Lens' Crop DateTime
 _created_at = _Newtype <<< prop (SProxy :: SProxy "created_at")
 
-_updated_at :: Lens' Pest DateTime
+_updated_at :: Lens' Crop DateTime
 _updated_at = _Newtype <<< prop (SProxy :: SProxy "updated_at")
 
 
-derive instance newtypePest :: Newtype Pest _
-derive instance genericPest :: Generic Pest _
-instance showPest :: Show Pest where
+derive instance newtypeCrop :: Newtype Crop _
+derive instance genericCrop :: Generic Crop _
+instance showCrop :: Show Crop where
   show = genericShow
 
-instance encodeJsonPest :: EncodeJson Pest where
-  encodeJson (Pest pest) =
+instance encodeJsonCrop :: EncodeJson Crop where
+  encodeJson (Crop pest) =
     encodeJson
     <<< Record.modify (SProxy :: _ "created_at") encodeDateTime
     <<< Record.modify (SProxy :: _ "updated_at") encodeDateTime
     $ pest
 
-instance decodeJsonPest :: DecodeJson Pest where
+instance decodeJsonCrop :: DecodeJson Crop where
   decodeJson json = do
     obj <- decodeJson json
     createdAt <- decodeDateTime obj.created_at
@@ -64,20 +60,18 @@ instance decodeJsonPest :: DecodeJson Pest where
 
 
 
-toEntity :: Pest -> PestEntity
-toEntity (Pest { label, crop }) =
-  PestEntity { label, crop }
+toEntity :: Crop -> CropEntity
+toEntity (Crop { label }) = CropEntity { label }
 
 
-newtype PestEntity =
-  PestEntity
+newtype CropEntity =
+  CropEntity
   { label :: String
-  , crop :: Maybe String
   }
 
-derive instance newtypePestEntity :: Newtype PestEntity _
-derive instance genericPestEntity :: Generic PestEntity _
-instance showPestEntity :: Show PestEntity where
+derive instance newtypeCropEntity :: Newtype CropEntity _
+derive instance genericCropEntity :: Generic CropEntity _
+instance showCropEntity :: Show CropEntity where
   show = genericShow
 
-derive newtype instance encodeJsonPestEntity :: EncodeJson PestEntity
+derive newtype instance encodeJsonCropEntity :: EncodeJson CropEntity

@@ -66,6 +66,15 @@ user_admin :: String
 user_admin = "管理者"
 
 
+crop :: String
+crop = "作物"
+
+crop_list :: String
+crop_list = crop <> "リスト"
+
+crop_label :: String
+crop_label = crop <> "名"
+
 pest :: String
 pest = "病害虫"
 
