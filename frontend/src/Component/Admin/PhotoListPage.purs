@@ -36,6 +36,8 @@ data Action
   | ToggleDeleting
   | SelectUser UserId
   | UnselectUser UserId
+  | SelectCrop String
+  | UnselectCrop String
   | SelectPest String
   | UnselectPest String
 
@@ -47,6 +49,7 @@ type State =
   , deleting :: Boolean
   , busy :: Boolean
   , selectedUsers :: Array UserId
+  , selectedCrops :: Array String
   , selectedPests :: Array String
   }
 
@@ -89,6 +92,7 @@ ui =
       , deleting: false
       , busy: false
       , selectedUsers: []
+      , selectedCrops: []
       , selectedPests: []
       }
 
@@ -105,9 +109,9 @@ render state =
   , LoadingIndicator.render state.busy
   , HH.div
     [ HP.class_ $ H.ClassName "mb-2" ]
-    [
-      HH.div_
+    [ HH.div_
       $ (renderFilteringUser <$> state.selectedUsers)
+      <> (renderFilteringCrop <$> state.selectedCrops)
       <> (renderFilteringPest <$> state.selectedPests)
     ]
   , HH.div
@@ -122,11 +126,9 @@ render state =
     renderFilteringUser userId =
       HH.div
       [ HP.class_ $ H.ClassName "btn-group mr-2" ]
-      [
-        HH.span
+      [ HH.span
         [ HP.class_ $ H.ClassName "input-group-addon" ]
-        [
-          HH.i [ HP.class_ $ H.ClassName "fa fa-user mr-2" ] []
+        [ HH.i [ HP.class_ $ H.ClassName "fa fa-user mr-2" ] []
         , HH.text $ fromMaybe "..." $ state.users ^? (ix userId <<< User._name)
         ]
       , HH.a
@@ -134,19 +136,33 @@ render state =
         , HP.href $ "#/photos"
         , HE.onClick $ const $ Just $ UnselectUser userId
         ]
-        [
-          HH.i [ HP.class_ $ H.ClassName "fa fa-times" ] []
+        [ HH.i [ HP.class_ $ H.ClassName "fa fa-times" ] []
+        ]
+      ]
+
+    renderFilteringCrop crop =
+      HH.div
+      [ HP.class_ $ H.ClassName "btn-group mr-2" ]
+      [ HH.span
+        [ HP.class_ $ H.ClassName "input-group-addon" ]
+        [ HH.i [ HP.class_ $ H.ClassName "fa fa-leaf mr-2" ] []
+        , HH.text crop
+        ]
+      , HH.a
+        [ HP.class_ $ H.ClassName "btn btn-secondary btn-outline"
+        , HP.href $ "#/photos"
+        , HE.onClick $ const $ Just $ UnselectCrop crop
+        ]
+        [ HH.i [ HP.class_ $ H.ClassName "fa fa-times" ] []
         ]
       ]
 
     renderFilteringPest pest =
       HH.div
       [ HP.class_ $ H.ClassName "btn-group mr-2" ]
-      [
-        HH.span
+      [ HH.span
         [ HP.class_ $ H.ClassName "input-group-addon" ]
-        [
-          HH.i [ HP.class_ $ H.ClassName "fa fa-bug mr-2" ] []
+        [ HH.i [ HP.class_ $ H.ClassName "fa fa-bug mr-2" ] []
         , HH.text pest
         ]
       , HH.a
@@ -154,16 +170,14 @@ render state =
         , HP.href $ "#/photos"
         , HE.onClick $ const $ Just $ UnselectPest pest
         ]
-        [
-          HH.i [ HP.class_ $ H.ClassName "fa fa-times" ] []
+        [ HH.i [ HP.class_ $ H.ClassName "fa fa-times" ] []
         ]
       ]
 
     renderDeletingButton =
       HH.div
       [ HP.class_ $ H.ClassName "pull-right mt-2" ]
-      [
-        HH.button
+      [ HH.button
         [ HP.class_ $ H.ClassName $ "btn rounded-circle " <> if deleting then "btn-danger" else "btn-outline-danger"
         , HE.onClick $ const $ Just $ ToggleDeleting
         ]
@@ -171,30 +185,26 @@ render state =
         ]
       ]
 
-    renderItem photo@(Photo { id, user_id, original_url, thumbnail_url, pest, created_at }) =
+    renderItem photo@(Photo { id, user_id, original_url, thumbnail_url, crop, pest, created_at }) =
       HH.div
       [ HP.class_ $ H.ClassName "col-md-2 col-sm-4 col-6 pb-2" ]
-      [
-        HH.div
+      [ HH.div
         [ HP.class_ $ H.ClassName "card position-relative" ]
-        [
-          HH.a
+        [ HH.a
           [ HP.href original_url, HP.target "_blank" ]
-          [
-            maybe (HH.div_ []) renderThumbnail thumbnail_url
+          [ maybe (HH.div_ []) renderThumbnail thumbnail_url
           ]
         , renderDeleteButton id
         , HH.div
           [ HP.class_ $ H.ClassName "d-flex p-2 bg-light text-secondary" ]
-          [
-            HH.small_
+          [ HH.small_
             [ HH.text $ show id ]
           , renderUser $ Map.lookup user_id state.users
           ]
         , HH.div
-          [ HP.class_ $ H.ClassName "card-body" ]
-          [
-            renderPest pest
+          [ HP.class_ $ H.ClassName "p-2" ]
+          [ renderCrop crop
+          , renderPest pest
           ]
         ]
       ]
@@ -212,8 +222,7 @@ render state =
         , HP.href $ "#/photos?user_id=" <> show id
         , HE.onClick $ const $ Just $ SelectUser id
         ]
-        [
-          HH.i [ HP.class_ $ H.ClassName "fa fa-user mr-2" ] []
+        [ HH.i [ HP.class_ $ H.ClassName "fa fa-user mr-2" ] []
         , HH.text name
         ]
       Nothing ->
@@ -221,28 +230,39 @@ render state =
         [ HP.class_ $ H.ClassName "ml-auto text-muted" ]
         [ HH.text "..." ]
 
+    renderCrop = case _ of
+      Just crop ->
+        HH.a
+        [ HP.class_ $ H.ClassName "btn btn-block ml-auto small"
+        , HP.href $ "#/photos?crop=" <> crop
+        , HE.onClick $ const $ Just $ SelectCrop crop
+        ]
+        [ HH.text crop ]
+      Nothing ->
+        HH.div
+        [ HP.class_ $ H.ClassName "btn btn-block text-muted" ]
+        [ HH.text Ja.no_crop ]
+
     renderPest = case _ of
       Just pest ->
         HH.a
-        [ HP.class_ $ H.ClassName "ml-auto small"
+        [ HP.class_ $ H.ClassName "btn btn-block ml-auto small"
         , HP.href $ "#/photos?pest=" <> pest
         , HE.onClick $ const $ Just $ SelectPest pest
         ]
         [ HH.text pest ]
       Nothing ->
         HH.div
-        [ HP.class_ $ H.ClassName "text-muted" ]
+        [ HP.class_ $ H.ClassName "btn btn-block text-muted" ]
         [ HH.text Ja.no_pest ]
 
 
     renderDeleteButton id =
       HH.div
       [ HP.class_ $ H.ClassName $ "delete-photo-button" <> if deleting then " _on" else "" ]
-      [
-        HH.div
+      [ HH.div
         [ HP.class_ $ H.ClassName "card-body text-center" ]
-        [
-          HH.button
+        [ HH.button
           [ HP.class_ $ H.ClassName "btn btn-danger rounded-circle"
           , HE.onClick $ const $ Just $ Destroy id
           ]
@@ -258,18 +278,17 @@ handleAction ::
 handleAction = case _ of
   Reload -> do
     Util.whenNotBusy_ do
-      { client, selectedUsers, selectedPests } <- H.get
+      { client, selectedUsers, selectedCrops, selectedPests } <- H.get
       let filters = flip execState Object.empty $ do
             when (not $ Array.null selectedUsers) $
               assign (at "user_id") $ Just $ Api.In_ $ show <$> selectedUsers
+            when (not $ Array.null selectedCrops) $
+              assign (at "crop") $ Just $ Api.In_ selectedCrops
             when (not $ Array.null selectedPests) $
               assign (at "pest") $ Just $ Api.In_ selectedPests
 
-      photos <- case Object.isEmpty filters of
-        true ->
-          H.liftAff $ attempt $ Photos.index client
-        false ->
-          H.liftAff $ attempt $ Photos.filter client filters
+      photos <- H.liftAff $ attempt $
+        bool (Photos.filter client filters) (Photos.index client) (Object.isEmpty filters)
 
       case photos of
         Right photos_ -> do
@@ -308,14 +327,22 @@ handleAction = case _ of
     H.modify_ _{ selectedUsers = Array.delete userId selectedUsers }
     handleAction Reload
 
+  SelectCrop crop -> do
+    { selectedCrops } <- H.get
+    when (selectedCrops /= [crop]) do
+      H.modify_ _{ selectedCrops = Array.nub $ Array.cons crop selectedCrops }
+      handleAction Reload
+
+  UnselectCrop crop -> do
+    { selectedCrops } <- H.get
+    H.modify_ _{ selectedCrops = Array.delete crop selectedCrops }
+    handleAction Reload
+
   SelectPest pest -> do
     { selectedPests } <- H.get
-    if selectedPests == [pest]
-      then
-        pure unit
-      else do
-        H.modify_ _{ selectedPests = Array.nub $ Array.cons pest selectedPests }
-        handleAction Reload
+    when (selectedPests /= [pest]) do
+      H.modify_ _{ selectedPests = Array.nub $ Array.cons pest selectedPests }
+      handleAction Reload
 
   UnselectPest pest -> do
     { selectedPests } <- H.get

@@ -32,11 +32,17 @@ photo_list = photo <> "リスト"
 take_photo :: String
 take_photo = "写真を撮る"
 
+select_crop :: String
+select_crop = crop <> "を選ぶ"
+
 select_pest :: String
-select_pest = "病害虫名を選ぶ"
+select_pest = pest <> "を選ぶ"
+
+no_crop :: String
+no_crop = crop <> "未選択"
 
 no_pest :: String
-no_pest = "病害虫未選択"
+no_pest = pest <> "未選択"
 
 without_hyphen :: String
 without_hyphen = "ハイフンなし"

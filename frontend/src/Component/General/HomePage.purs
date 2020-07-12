@@ -4,6 +4,7 @@ import AppPrelude
 
 import Affjax (URL)
 import Api as Api
+import Api.Crops as Crops
 import Api.My.Photos as Photos
 import Api.Pests as Pests
 import Component.HTML.LoadingIndicator as LoadingIndicator
@@ -19,15 +20,18 @@ import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Query.HalogenM as HM
 import I18n.Ja as Ja
+import Model (atOf)
+import Model.Crop (Crop(..))
 import Model.DateTime (Locale)
-import Model.Pest (Pest (..))
-import Model.Photo (Photo (..), PhotoId, _original_url, _pest, _thumbnail_url)
+import Model.Pest (Pest(..))
+import Model.Photo (Photo(..), PhotoId, _crop, _original_url, _pest, _thumbnail_url)
 import Model.Photo as Photo
 
 
 data Action
   = Initialize
   | Reload
+  | SetCrop Photo String
   | SetPest Photo String
   | Destroy PhotoId
   | ToggleDeleting
@@ -38,6 +42,7 @@ type State =
   , loadingItems :: Array URL
   , client :: Api.Client
   , locale :: Locale
+  , crops :: Array Crop
   , pests :: Array Pest
   , deleting :: Boolean
   , busy :: Boolean
@@ -75,6 +80,7 @@ ui =
       , loadingItems: []
       , client
       , locale
+      , crops: []
       , pests: []
       , deleting: false
       , busy: false
@@ -86,8 +92,7 @@ render ::
   State -> H.ComponentHTML Action ChildSlots m
 render state =
   HH.div_
-  [
-    renderDeletingButton
+  [ renderDeletingButton
   , HH.h1_
     [ HH.text Ja.photo_list ]
   , LoadingIndicator.render state.busy
@@ -105,8 +110,7 @@ render state =
     renderDeletingButton =
       HH.div
       [ HP.class_ $ H.ClassName "pull-right mt-2" ]
-      [
-        HH.button
+      [ HH.button
         [ HP.class_ $ H.ClassName $ "btn rounded-circle " <> if deleting then "btn-danger" else "btn-outline-danger"
         , HE.onClick $ const $ Just $ ToggleDeleting
         ]
@@ -119,11 +123,9 @@ render state =
       [ HP.class_ $ H.ClassName "col-md-2 col-sm-4 col-6 pb-2" ]
       [ HH.div
         [ HP.class_ $ H.ClassName "card" ]
-        [
-          HH.div
+        [ HH.div
           [ HP.class_ $ H.ClassName "card-body text-center" ]
-          [
-            HH.slot (SProxy :: _ "upload") unit UploadUI.ui { client } $ Just <<< HandleUpload
+          [ HH.slot (SProxy :: _ "upload") unit UploadUI.ui { client } $ Just <<< HandleUpload
           ]
         ]
       ]
@@ -133,11 +135,9 @@ render state =
       [ HP.class_ $ H.ClassName "col-md-2 col-sm-4 col-6 pb-2" ]
       [ HH.div
         [ HP.class_ $ H.ClassName "card" ]
-        [
-          HH.div
+        [ HH.div
           [ HP.class_ $ H.ClassName "card-body text-center" ]
-          [
-            HH.i [ HP.class_ $ H.ClassName "fa fa-spinner fa-pulse fa-3x" ] []
+          [ HH.i [ HP.class_ $ H.ClassName "fa fa-spinner fa-pulse fa-3x" ] []
           ]
         ]
       ]
@@ -147,13 +147,12 @@ render state =
       [ HP.class_ $ H.ClassName "col-md-2 col-sm-4 col-6 pb-2" ]
       [ HH.div
         [ HP.class_ $ H.ClassName "card position-relative" ]
-        [
-          HH.a
+        [ HH.a
           [ HP.href original_url, HP.target "_blank" ]
-          [
-            maybe (HH.div_ []) renderThumbnail thumbnail_url
+          [ maybe (HH.div_ []) renderThumbnail thumbnail_url
           ]
         , renderDeleteButton id
+        , renderCrop photo
         , renderPest photo
         ]
       ]
@@ -167,11 +166,9 @@ render state =
     renderDeleteButton id =
       HH.div
       [ HP.class_ $ H.ClassName $ "delete-photo-button" <> if deleting then " _on" else "" ]
-      [
-        HH.div
+      [ HH.div
         [ HP.class_ $ H.ClassName "card-body text-center" ]
-        [
-          HH.button
+        [ HH.button
           [ HP.class_ $ H.ClassName "btn btn-danger rounded-circle"
           , HE.onClick $ const $ Just $ Destroy id
           ]
@@ -180,13 +177,37 @@ render state =
         ]
       ]
 
-    renderPest photo@(Photo { pest }) =
+    renderCrop photo@(Photo { crop }) =
       HH.select
       [ HP.class_ $ H.ClassName "form-control"
+        <> wrap (bool "" " text-muted" (isNothing crop))
+      , HE.onValueChange $ Just <<< SetCrop photo
+      ]
+      $ [ renderDefaultCropOption crop ]
+      <> (renderCropOption crop <$> state.crops)
+
+    renderDefaultCropOption selected =
+      HH.option
+      [ HP.enabled false
+      , HP.selected $ isNothing selected
+      ]
+      [ HH.text Ja.select_crop ]
+
+    renderCropOption selected (Crop { label }) =
+      HH.option
+      [ HP.value $ label
+      , HP.selected $ selected == Just label
+      ]
+      [ HH.text label ]
+
+    renderPest photo@(Photo { crop, pest }) =
+      HH.select
+      [ HP.class_ $ H.ClassName "form-control"
+        <> wrap (bool "" " text-muted" (isNothing pest))
       , HE.onValueChange $ Just <<< SetPest photo
       ]
       $ [ renderDefaultPestOption pest ]
-      <> (renderPestOption pest <$> state.pests)
+      <> (renderPestOption pest <$> (Array.filter (\ (Pest pest_) -> pest_.crop == crop) state.pests))
 
     renderDefaultPestOption selected =
       HH.option
@@ -208,6 +229,7 @@ handleAction ::
   Action -> H.HalogenM State Action ChildSlots Message m Unit
 handleAction = case _ of
   Initialize -> do
+    void $ HM.fork loadCrops
     void $ HM.fork loadPests
     void $ HM.fork runPoller
     handleAction $ Reload
@@ -216,30 +238,36 @@ handleAction = case _ of
     Util.whenNotBusy_ do
       cli <- H.gets _.client
       photos <- H.liftAff $ attempt $ Photos.index cli
-
       case photos of
-        Right photos_ ->
-          H.modify_ _{ items = photos_ }
-        Left _ ->
-          H.raise $ Failed "Failed to access api."
+        Right photos_ -> H.modify_ _{ items = photos_ }
+        Left _ -> H.raise $ Failed "Failed to access api."
 
-  SetPest photo label -> do
+  SetCrop photo@(Photo { id }) label -> do
     Util.whenNotBusy_ do
       cli <- H.gets _.client
-      let pest = if String.null label then Nothing else Just label
-      res <- H.liftAff $ attempt $ Photos.update cli $ photo # _pest .~ pest
+      items <- H.gets _.items
+      let crop = bool (Just label) Nothing $ String.null label
+      let photo_ = photo # _crop .~ crop # _pest .~ Nothing
+      H.modify_ _{ items = items # atOf id .~ Just photo_ }
+      res <- H.liftAff $ attempt $ Photos.update cli photo_
+      when (isLeft res) do
+        H.raise $ Failed "Failed to update photo."
 
-      case res of
-        Right _ -> do
-          pure unit
-        Left _ -> do
-          H.raise $ Failed "Failed to update photo."
+  SetPest photo@(Photo { id }) label -> do
+    Util.whenNotBusy_ do
+      cli <- H.gets _.client
+      items <- H.gets _.items
+      let pest = bool (Just label) Nothing $ String.null label
+      let photo_ = photo # _pest .~ pest
+      H.modify_ _{ items = items # atOf id .~ Just photo_ }
+      res <- H.liftAff $ attempt $ Photos.update cli photo_
+      when (isLeft res) do
+        H.raise $ Failed "Failed to update photo."
 
   Destroy photoId -> do
     Util.whenNotBusy_ do
       cli <- H.gets _.client
       res <- H.liftAff $ attempt $ Photos.destroy cli photoId
-
       case res of
         Right _ -> do
           items <- Array.filter ((photoId /= _) <<< view Photo._id) <$> H.gets _.items
@@ -257,6 +285,19 @@ handleAction = case _ of
 
   HandleUpload (UploadUI.Failed s) -> do
     H.raise $ Failed s
+
+loadCrops :: forall m. MonadAff m => H.HalogenM State Action ChildSlots Message m Unit
+loadCrops = do
+  cli <- H.gets _.client
+  res <- H.liftAff $ attempt $ Crops.index cli
+
+  case res of
+    Right crops -> do
+      H.modify_ _{ crops = crops }
+    Left _ -> do
+      H.raise $ Failed "Failed to load Crops. Retrying..."
+      H.liftAff $ delay (Milliseconds 5000.0)
+      loadCrops
 
 loadPests :: forall m. MonadAff m => H.HalogenM State Action ChildSlots Message m Unit
 loadPests = do

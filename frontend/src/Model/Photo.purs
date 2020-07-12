@@ -41,6 +41,9 @@ _original_url = _Newtype <<< prop (SProxy :: SProxy "original_url")
 _thumbnail_url :: Lens' Photo (Maybe String)
 _thumbnail_url = _Newtype <<< prop (SProxy :: SProxy "thumbnail_url")
 
+_crop :: Lens' Photo (Maybe String)
+_crop = _Newtype <<< prop (SProxy :: SProxy "crop")
+
 _pest :: Lens' Photo (Maybe String)
 _pest = _Newtype <<< prop (SProxy :: SProxy "pest")
 
