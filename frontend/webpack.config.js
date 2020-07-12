@@ -2,13 +2,10 @@ const _ = require('lodash');
 const path = require('path');
 const webpack = require('webpack');
 const MiniCssExtractPlugin = require("mini-css-extract-plugin");
-// const CleanupPlugin = require('webpack-cleanup-plugin');
-// const ExtractTextPlugin = require('extract-text-webpack-plugin');
-// const HtmlPlugin = require('html-webpack-plugin');
-// const HtmlExcludeAssetsPlugin = require('html-webpack-exclude-assets-plugin');
-// const CopyPlugin = require('copy-webpack-plugin');
+const HtmlPlugin = require('html-webpack-plugin');
+const CopyPlugin = require('copy-webpack-plugin');
+const Handlebars = require('handlebars');
 
-// const OmitPlugin = require('./lib/omit-webpack-plugin');
 const helper = require('./lib/helper');
 
 process.env.STAGE = process.env.STAGE || 'dev';
@@ -38,15 +35,12 @@ const entries = {
     index: './src/entry_general.js',
     admin: './src/entry_admin.js'
   },
-  static: {
-  }
 }
 
 
 module.exports = {
   entry: {
     ...entries.regular,
-    ...entries.static
   },
 
   output: {
@@ -67,27 +61,23 @@ module.exports = {
     }),
     // new ExtractTextPlugin(nameWith('styles', '.css')),
 
-    // ...Object.keys(entries.regular).map(k => new HtmlPlugin({
-    //   filename: (k === 'index') ? 'index.html' : `${k}/index.html`,
-    //   template: `./static/${k}.html`,
-    //   chunks: [k]
-    // })),
+    ...Object.keys(entries.regular).map(k => new HtmlPlugin({
+      filename: (k === 'index') ? 'index.html' : `${k}/index.html`,
+      template: `./src/index.html`,
+      title: require('./output/I18n.Ja').higaidar,
+      favicon: './static/favicon.ico',
+      meta: {
+        STAGE: process.env.STAGE,
+        ...helper.readPublicEnv(process.env.STAGE)
+      },
+      chunks: [k]
+    })),
 
-    // ...Object.keys(entries.static).map(k => new HtmlPlugin({
-    //   filename: `${k}.html`,
-    //   template: `./static/${k}.html`,
-    //   chunks: [k],
-    //   excludeAssets: [/.*\.js/]
-    // })),
-
-    // new CopyPlugin([
-    //   './static/favicon.ico'
-    // ]),
-    // new HtmlExcludeAssetsPlugin(),
-    // new CleanupPlugin(),
-    // new OmitPlugin({
-    //   chunks: _.keys(entries.static)
-    // })
+    new CopyPlugin({
+      patterns: [
+        { from: "static", to: output_dir }
+      ]
+    }),
   ],
 
   module: {
@@ -106,12 +96,34 @@ module.exports = {
         ]
       },
       {
+        test: /\.(tiff|ico|svg|eot|otf|ttf|woff|woff2)$/,
+        use: [
+          {
+            loader: "file-loader",
+            options: {
+              name: "media/[folder]/[name]-[hash:8].[ext]",
+            },
+          },
+        ]
+      },
+      {
         test: /\.html$/,
         use: [
           {
             loader: 'html-loader',
             options: {
-              interpolate: true
+              preprocessor: (content, loaderContext) => {
+                let result;
+                try {
+                  result = Handlebars.compile(content)({
+                    title: require('./output/I18n.Ja').higaidar,
+                  });
+                } catch (error) {
+                  loaderContext.emitError(error);
+                  return content;
+                }
+                return result;
+              },
             }
           },
         ]
@@ -151,6 +163,7 @@ module.exports = {
     headers: {
       "Access-Control-Allow-Origin": "*"
     },
+    contentBase: output_dir,
     publicPath
   }
 };
