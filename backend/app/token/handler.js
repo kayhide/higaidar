@@ -45,10 +45,12 @@ module.exports.authorize = (event, context, callback) => {
       ? [
         ['Allow', ['*/users', '*/users/*']],
         ['Allow', ['*/photos', '*/photos/*']],
+        ['Allow', ['*/crops', '*/crops/*']],
         ['Allow', ['*/pests', '*/pests/*']],
         ['Allow', ['*/my/*']],
       ]
       : [
+        ['Allow', ['GET/crops']],
         ['Allow', ['GET/pests']],
         ['Allow', ['*/my/*']],
       ];

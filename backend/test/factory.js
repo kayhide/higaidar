@@ -19,6 +19,7 @@ const factory = {
         key: `${100 + i}/photo-${i}.jpg`,
         original_url: `http://higaidar.test/${100 + i}/photo-${i}.jpg`,
         thumbnail_url: null,
+        crop: null,
         pest: null
       }
     };

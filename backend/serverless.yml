@@ -149,6 +149,34 @@ functions:
           authorizer: authorize
 
 
+  crops-index:
+    handler: app/crops/handler.index
+    events:
+      - http:
+          path: crops
+          method: get
+          cors: true
+          authorizer: authorize
+
+  crops-create:
+    handler: app/crops/handler.create
+    events:
+      - http:
+          path: crops
+          method: post
+          cors: true
+          authorizer: authorize
+
+  crops-destroy:
+    handler: app/crops/handler.destroy
+    events:
+      - http:
+          path: crops/{id}
+          method: delete
+          cors: true
+          authorizer: authorize
+
+
   pests-index:
     handler: app/pests/handler.index
     events:

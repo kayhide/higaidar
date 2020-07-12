@@ -4,6 +4,7 @@ module.exports.define = (sequelize) => sequelize.define('photo', {
   key: { type: Sequelize.STRING },
   original_url: { type: Sequelize.STRING },
   thumbnail_url: { type: Sequelize.STRING },
+  crop: { type: Sequelize.STRING },
   pest: { type: Sequelize.STRING },
 }, {
   timestamps: true,

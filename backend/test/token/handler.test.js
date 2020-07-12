@@ -113,15 +113,27 @@ describe('token', () => {
         return co(function *() {
           const res = yield handle(event, {});
           const statements = res.policyDocument.Statement;
-          assert(statements.length === 2);
-          assert(statements[0].Action === 'execute-api:Invoke');
-          assert(statements[0].Effect === 'Allow');
-          assert(_.isEqual(statements[0].Resource, [
+          assert(statements.length === 3);
+          let i;
+
+          i = 0;
+          assert(statements[i].Action === 'execute-api:Invoke');
+          assert(statements[i].Effect === 'Allow');
+          assert(_.isEqual(statements[i].Resource, [
+            'arn:aws:execute-api:ap-northheast-1::api-id/test/GET/crops'
+          ]));
+
+          i = 1;
+          assert(statements[i].Action === 'execute-api:Invoke');
+          assert(statements[i].Effect === 'Allow');
+          assert(_.isEqual(statements[i].Resource, [
             'arn:aws:execute-api:ap-northheast-1::api-id/test/GET/pests'
           ]));
-          assert(statements[1].Action === 'execute-api:Invoke');
-          assert(statements[1].Effect === 'Allow');
-          assert(_.isEqual(statements[1].Resource, [
+
+          i = 2;
+          assert(statements[i].Action === 'execute-api:Invoke');
+          assert(statements[i].Effect === 'Allow');
+          assert(_.isEqual(statements[i].Resource, [
             'arn:aws:execute-api:ap-northheast-1::api-id/test/*/my/*'
           ]));
         });
@@ -143,28 +155,45 @@ describe('token', () => {
         return co(function *() {
           const res = yield handle(event, {});
           const statements = res.policyDocument.Statement;
-          assert(statements.length === 4);
-          assert(statements[0].Action === 'execute-api:Invoke');
-          assert(statements[0].Effect === 'Allow');
-          assert(_.isEqual(statements[0].Resource, [
+          assert(statements.length === 5);
+          let i;
+
+          i = 0;
+          assert(statements[i].Action === 'execute-api:Invoke');
+          assert(statements[i].Effect === 'Allow');
+          assert(_.isEqual(statements[i].Resource, [
             'arn:aws:execute-api:ap-northheast-1::api-id/test/*/users',
             'arn:aws:execute-api:ap-northheast-1::api-id/test/*/users/*'
           ]));
-          assert(statements[1].Action === 'execute-api:Invoke');
-          assert(statements[1].Effect === 'Allow');
-          assert(_.isEqual(statements[1].Resource, [
+
+          i = 1;
+          assert(statements[i].Action === 'execute-api:Invoke');
+          assert(statements[i].Effect === 'Allow');
+          assert(_.isEqual(statements[i].Resource, [
             'arn:aws:execute-api:ap-northheast-1::api-id/test/*/photos',
             'arn:aws:execute-api:ap-northheast-1::api-id/test/*/photos/*'
           ]));
-          assert(statements[2].Action === 'execute-api:Invoke');
-          assert(statements[2].Effect === 'Allow');
-          assert(_.isEqual(statements[2].Resource, [
+
+          i = 2;
+          assert(statements[i].Action === 'execute-api:Invoke');
+          assert(statements[i].Effect === 'Allow');
+          assert(_.isEqual(statements[i].Resource, [
+            'arn:aws:execute-api:ap-northheast-1::api-id/test/*/crops',
+            'arn:aws:execute-api:ap-northheast-1::api-id/test/*/crops/*'
+          ]));
+
+          i = 3;
+          assert(statements[i].Action === 'execute-api:Invoke');
+          assert(statements[i].Effect === 'Allow');
+          assert(_.isEqual(statements[i].Resource, [
             'arn:aws:execute-api:ap-northheast-1::api-id/test/*/pests',
             'arn:aws:execute-api:ap-northheast-1::api-id/test/*/pests/*'
           ]));
-          assert(statements[3].Action === 'execute-api:Invoke');
-          assert(statements[3].Effect === 'Allow');
-          assert(_.isEqual(statements[3].Resource, [
+
+          i = 4;
+          assert(statements[i].Action === 'execute-api:Invoke');
+          assert(statements[i].Effect === 'Allow');
+          assert(_.isEqual(statements[i].Resource, [
             'arn:aws:execute-api:ap-northheast-1::api-id/test/*/my/*'
           ]));
         });
