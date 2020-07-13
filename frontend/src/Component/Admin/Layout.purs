@@ -126,8 +126,7 @@ render state =
           <> if isAuthenticated then "btn-secondary" else "btn-outline-secondary"
         , HP.href $ R.path R.Login
         ]
-        [
-          HH.i [ HP.class_ $ H.ClassName "fa fa-user fa-fw" ] []
+        [ HH.i [ HP.class_ $ H.ClassName "fa fa-user fa-fw" ] []
         ]
       ]
 
@@ -165,13 +164,11 @@ render state =
         [ HP.class_ $ H.ClassName "nav flex-column" ]
         [ HH.li
           [ HP.class_ $ H.ClassName "nav-item" ]
-          [
-            HH.a
+          [ HH.a
             [ HP.class_ $ H.ClassName "nav-link"
             , HP.href $ R.path $ R.UsersIndex
             ]
-            [
-              HH.i [ HP.class_ $ H.ClassName "fa fa-fw fa-users mr-2" ] []
+            [ HH.i [ HP.class_ $ H.ClassName "fa fa-fw fa-users mr-2" ] []
             , HH.text Ja.user
             ]
           ]
@@ -181,9 +178,18 @@ render state =
             [ HP.class_ $ H.ClassName "nav-link"
             , HP.href $ R.path $ R.PhotosIndex
             ]
-            [
-              HH.i [ HP.class_ $ H.ClassName "fa fa-fw fa-picture-o mr-2" ] []
+            [ HH.i [ HP.class_ $ H.ClassName "fa fa-fw fa-picture-o mr-2" ] []
             , HH.text Ja.photo
+            ]
+          ]
+        , HH.li
+          [ HP.class_ $ H.ClassName "nav-item" ]
+          [ HH.a
+            [ HP.class_ $ H.ClassName "nav-link"
+            , HP.href $ R.path $ R.CropsIndex
+            ]
+            [ HH.i [ HP.class_ $ H.ClassName "fa fa-fw fa-leaf mr-2" ] []
+            , HH.text Ja.crop
             ]
           ]
         , HH.li
@@ -192,8 +198,7 @@ render state =
             [ HP.class_ $ H.ClassName "nav-link"
             , HP.href $ R.path $ R.PestsIndex
             ]
-            [
-              HH.i [ HP.class_ $ H.ClassName "fa fa-fw fa-bug mr-2" ] []
+            [ HH.i [ HP.class_ $ H.ClassName "fa fa-fw fa-bug mr-2" ] []
             , HH.text Ja.pest
             ]
           ]
