@@ -88,7 +88,7 @@ describe('token', () => {
       event.methodArn = 'arn:aws:execute-api:ap-northheast-1::api-id/test/GET/something';
     }));
 
-    context('with valid token of non-admin user', () => {
+    context('with valid token of ordinary user', () => {
       beforeEach(() => co(function* () {
         user = yield factory.create(User);
         token = jwt.sign(
@@ -120,6 +120,56 @@ describe('token', () => {
         ]));
 
         i = 2;
+        assert(statements[i].Action === 'execute-api:Invoke');
+        assert(statements[i].Effect === 'Allow');
+        assert(_.isEqual(statements[i].Resource, [
+          'arn:aws:execute-api:ap-northheast-1::api-id/test/*/my/*',
+        ]));
+      }));
+    });
+
+    context('with valid token of editor user', () => {
+      beforeEach(() => co(function* () {
+        user = yield factory.create(User, { is_editor: true });
+        token = jwt.sign(
+          { user: user.dataValues },
+          process.env.JWT_SECRET,
+          { expiresIn: process.env.JWT_EXPIRES_IN },
+        );
+        event.authorizationToken = `Bearer ${token}`;
+      }));
+
+      it('generates policy', () => co(function* () {
+        const res = yield handle(event, {});
+        const statements = res.policyDocument.Statement;
+        assert(statements.length === 4);
+        let i;
+
+        i = 0;
+        assert(statements[i].Action === 'execute-api:Invoke');
+        assert(statements[i].Effect === 'Allow');
+        assert(_.isEqual(statements[i].Resource, [
+          'arn:aws:execute-api:ap-northheast-1::api-id/test/*/photos',
+          'arn:aws:execute-api:ap-northheast-1::api-id/test/*/photos/*',
+        ]));
+
+        i = 1;
+        assert(statements[i].Action === 'execute-api:Invoke');
+        assert(statements[i].Effect === 'Allow');
+        assert(_.isEqual(statements[i].Resource, [
+          'arn:aws:execute-api:ap-northheast-1::api-id/test/*/crops',
+          'arn:aws:execute-api:ap-northheast-1::api-id/test/*/crops/*',
+        ]));
+
+        i = 2;
+        assert(statements[i].Action === 'execute-api:Invoke');
+        assert(statements[i].Effect === 'Allow');
+        assert(_.isEqual(statements[i].Resource, [
+          'arn:aws:execute-api:ap-northheast-1::api-id/test/*/pests',
+          'arn:aws:execute-api:ap-northheast-1::api-id/test/*/pests/*',
+        ]));
+
+        i = 3;
         assert(statements[i].Action === 'execute-api:Invoke');
         assert(statements[i].Effect === 'Allow');
         assert(_.isEqual(statements[i].Resource, [

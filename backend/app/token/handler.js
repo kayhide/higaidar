@@ -41,19 +41,29 @@ module.exports.authorize = (event, context, callback) => {
     if (!m) throw new Error('Bad token');
     const token = m[1];
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const effects = decoded.user.is_admin
-      ? [
+    let effects;
+    if (decoded.user.is_admin) {
+      effects = [
         ['Allow', ['*/users', '*/users/*']],
         ['Allow', ['*/photos', '*/photos/*']],
         ['Allow', ['*/crops', '*/crops/*']],
         ['Allow', ['*/pests', '*/pests/*']],
         ['Allow', ['*/my/*']],
-      ]
-      : [
+      ];
+    } else if (decoded.user.is_editor) {
+      effects = [
+        ['Allow', ['*/photos', '*/photos/*']],
+        ['Allow', ['*/crops', '*/crops/*']],
+        ['Allow', ['*/pests', '*/pests/*']],
+        ['Allow', ['*/my/*']],
+      ];
+    } else {
+      effects = [
         ['Allow', ['GET/crops']],
         ['Allow', ['GET/pests']],
         ['Allow', ['*/my/*']],
       ];
+    }
     const resource = event.methodArn.replace(/\/.*/, `/${process.env.STAGE}/`);
     const policy = generatePolicy('user', effects, resource);
     policy.context = {
