@@ -15,6 +15,7 @@ import Dom.Storage as Storage
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
+import Halogen.HTML.Properties (ButtonType(..))
 import Halogen.HTML.Properties as HP
 import I18n.Ja as Ja
 
@@ -81,7 +82,7 @@ render state@({ form: AuthenticateForm { code, tel } }) =
 
   where
     renderForm =
-      HH.div
+      HH.form
       [ HP.class_ $ H.ClassName "form" ]
       [
         renderInput "user-code" Ja.user_code Client._code
@@ -106,6 +107,7 @@ render state@({ form: AuthenticateForm { code, tel } }) =
       HH.button
       [ HP.class_ $ H.ClassName $ "btn btn-outline-secondary"
         <> bool "" " disabled" (isAuthenticated state.client)
+      , HP.type_ ButtonSubmit
       , HE.onClick $ const $ Just Authenticate
       ]
       [ HH.i [ HP.class_ $ H.ClassName "fa fa-sign-in fa-fw mr-1" ] []

@@ -2,7 +2,7 @@ module Component.Admin.Layout where
 
 import AppPrelude
 
-import Api.Client (Client(..), isAuthenticated, makeClient)
+import Api.Client (Client(..), isAdmin, isAuthenticated, isEditor, makeClient)
 import AppConfig (AppConfig)
 import Component.Admin.CropListPage as CropListPage
 import Component.Admin.PestListPage as PestListPage
@@ -97,6 +97,8 @@ render state =
   where
     client = state.apiClient
     locale = state.locale
+    isAdmin' = isAdmin client
+    isEditor' = isEditor client
 
     renderNavbar =
       HH.nav
@@ -113,12 +115,12 @@ render state =
         [ HH.text $ String.take 1 Ja.higaidar ]
       , HH.ul
         [ HP.class_ $ H.ClassName "navbar-nav mr-auto" ]
-        [
-          renderMenuItem R.UsersIndex Ja.user "users"
-        , renderMenuItem R.PhotosIndex Ja.photo "picture-o"
-        , renderMenuItem R.CropsIndex Ja.crop "leaf"
-        , renderMenuItem R.PestsIndex Ja.pest "bug"
-        ]
+        $ bool [] [ renderMenuItem R.UsersIndex Ja.user "users" ] isAdmin'
+        <> [ renderMenuItem R.PhotosIndex Ja.photo "picture-o"
+           , renderMenuItem R.CropsIndex Ja.crop "leaf"
+           , renderMenuItem R.PestsIndex Ja.pest "bug"
+           ]
+      , renderAdminMenu
       , renderUserName
       , HH.a
         [ HP.class_ $ H.ClassName $ "btn btn-sm "
@@ -148,6 +150,24 @@ render state =
         []
       ]
 
+    renderAdminMenu = case isAdmin', isEditor' of
+      true, _ ->
+        HH.a
+        [ HP.class_ $ H.ClassName "badge badge-danger ml-auto mr-2"
+        , HP.href "/admin/#/"
+        ]
+        [ HH.text "admin" ]
+      _, true ->
+        HH.a
+        [ HP.class_ $ H.ClassName "badge badge-success ml-auto mr-2"
+        , HP.href "/admin/#/"
+        ]
+        [ HH.text "editor" ]
+      _, _ ->
+        HH.ul
+        [ HP.class_ $ H.ClassName "navbar-nav ml-auto" ]
+        []
+
     renderUserName = case client of
       Client { user: Just (User { name }) } ->
         HH.span
@@ -160,47 +180,8 @@ render state =
       R.Home ->
         withAuthentication
         $ HH.ul
-        [ HP.class_ $ H.ClassName "nav flex-column" ]
-        [ HH.li
-          [ HP.class_ $ H.ClassName "nav-item" ]
-          [ HH.a
-            [ HP.class_ $ H.ClassName "nav-link"
-            , HP.href $ R.path $ R.UsersIndex
-            ]
-            [ HH.i [ HP.class_ $ H.ClassName "fa fa-fw fa-users mr-2" ] []
-            , HH.text Ja.user
-            ]
-          ]
-        , HH.li
-          [ HP.class_ $ H.ClassName "nav-item" ]
-          [ HH.a
-            [ HP.class_ $ H.ClassName "nav-link"
-            , HP.href $ R.path $ R.PhotosIndex
-            ]
-            [ HH.i [ HP.class_ $ H.ClassName "fa fa-fw fa-picture-o mr-2" ] []
-            , HH.text Ja.photo
-            ]
-          ]
-        , HH.li
-          [ HP.class_ $ H.ClassName "nav-item" ]
-          [ HH.a
-            [ HP.class_ $ H.ClassName "nav-link"
-            , HP.href $ R.path $ R.CropsIndex
-            ]
-            [ HH.i [ HP.class_ $ H.ClassName "fa fa-fw fa-leaf mr-2" ] []
-            , HH.text Ja.crop
-            ]
-          ]
-        , HH.li
-          [ HP.class_ $ H.ClassName "nav-item" ]
-          [ HH.a
-            [ HP.class_ $ H.ClassName "nav-link"
-            , HP.href $ R.path $ R.PestsIndex
-            ]
-            [ HH.i [ HP.class_ $ H.ClassName "fa fa-fw fa-bug mr-2" ] []
-            , HH.text Ja.pest
-            ]
-          ]
+        [ HP.class_ $ H.ClassName "h2" ]
+        [ HH.text $ bool (bool "" Ja.editor_page isEditor') Ja.admin_page isAdmin'
         ]
 
       R.Login ->
@@ -208,7 +189,6 @@ render state =
 
       R.UsersIndex ->
         withAuthentication
-        -- $ HH.slot' cpUserList UserListPage.Slot UserListPage.ui { client, locale } $ HE.input HandleUserList
         $ HH.slot (SProxy :: _ "userList") unit UserListPage.ui { client, locale } $ Just <<< HandleUserList
 
       R.UsersShow userId ->

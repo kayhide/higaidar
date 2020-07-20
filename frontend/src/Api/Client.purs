@@ -8,7 +8,7 @@ import Data.Generic.Rep.Show (genericShow)
 import Data.Lens (Lens', lens)
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
-import Model.User (User)
+import Model.User (User(..))
 
 
 newtype Client
@@ -35,6 +35,15 @@ _user = lens (_.user <<< unwrap) (\s a -> wrap $ _{ user = a } $ unwrap s)
 _token :: Lens' Client (Maybe AuthenticationToken)
 _token = lens (_.token <<< unwrap) (\s a -> wrap $ _{ token = a } $ unwrap s)
 
+isAdmin :: Client -> Boolean
+isAdmin = case _ of
+  Client { user: Just (User { is_admin: true }) } -> true
+  _ -> false
+
+isEditor :: Client -> Boolean
+isEditor = case _ of
+  Client { user: Just (User { is_editor: true }) } -> true
+  _ -> false
 
 type UserCode = String
 type UserTel = String

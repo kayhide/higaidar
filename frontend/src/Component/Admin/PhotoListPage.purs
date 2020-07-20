@@ -3,7 +3,7 @@ module Component.Admin.PhotoListPage where
 import AppPrelude
 
 import Api as Api
-import Api.Client (Client)
+import Api.Client (Client, isAdmin)
 import Api.Photos as Photos
 import Api.Users as Users
 import Component.HTML.LoadingIndicator as LoadingIndicator
@@ -200,7 +200,7 @@ render state =
           [ HP.class_ $ H.ClassName "d-flex p-2 bg-light text-secondary" ]
           [ HH.small_
             [ HH.text $ show id ]
-          , renderUser $ Map.lookup user_id state.users
+          , bool (HH.text "") (renderUser $ Map.lookup user_id state.users) (isAdmin client)
           ]
         , HH.div
           [ HP.class_ $ H.ClassName "p-2" ]
@@ -294,7 +294,8 @@ handleAction = case _ of
       case photos of
         Right photos_ -> do
           H.modify_ _{ items = photos_ }
-          void $ HM.fork loadUsers
+          when (isAdmin client) do
+            void $ HM.fork loadUsers
         Left _ ->
           H.raise $ Failed "Failed to access api."
 

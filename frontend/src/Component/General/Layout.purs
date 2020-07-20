@@ -2,7 +2,7 @@ module Component.General.Layout where
 
 import AppPrelude
 
-import Api.Client (Client(..), isAuthenticated, makeClient)
+import Api.Client (Client(..), isAdmin, isAuthenticated, isEditor, makeClient)
 import AppConfig (AppConfig)
 import Component.General.HomePage as HomePage
 import Component.General.Route as R
@@ -102,14 +102,20 @@ render state =
       "btn btn-outline-primary mb-2"
       <> bool " disabled" "" (isAuthenticated client)
 
-    renderAdminMenu = case client of
-      Client { user: Just (User { is_admin: true }) } ->
+    renderAdminMenu = case isAdmin client, isEditor client of
+      true, _ ->
         HH.a
         [ HP.class_ $ H.ClassName "badge badge-danger ml-auto mr-2"
         , HP.href "/admin/#/"
         ]
         [ HH.text "admin" ]
-      _ ->
+      _, true ->
+        HH.a
+        [ HP.class_ $ H.ClassName "badge badge-success ml-auto mr-2"
+        , HP.href "/admin/#/"
+        ]
+        [ HH.text "editor" ]
+      _, _ ->
         HH.ul
         [ HP.class_ $ H.ClassName "navbar-nav ml-auto" ]
         []
@@ -134,12 +140,10 @@ render state =
 
     renderPage = case _ of
       R.Login ->
-        -- HH.slot' cpLogin LoginUI.Slot LoginUI.ui client $ HE.input HandleLogin
         HH.slot (SProxy :: _ "login") unit LoginUI.ui client $ Just <<< HandleLogin
 
       R.Home ->
         withAuthentication
-        -- $ HH.slot' cpHome HomePage.Slot HomePage.ui { client, locale } $ HE.input HandleHome
         $ HH.slot (SProxy :: _ "home") unit HomePage.ui { client, locale } $ Just <<< HandleHome
 
     withAuthentication html =

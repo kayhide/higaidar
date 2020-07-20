@@ -22,6 +22,7 @@ newtype User =
   , tel :: String
   , name :: String
   , is_admin :: Boolean
+  , is_editor :: Boolean
   , created_at :: DateTime
   , updated_at :: DateTime
   }
@@ -40,6 +41,9 @@ _name = _Newtype <<< prop (SProxy :: SProxy "name")
 
 _is_admin :: Lens' User Boolean
 _is_admin = _Newtype <<< prop (SProxy :: SProxy "is_admin")
+
+_is_editor :: Lens' User Boolean
+_is_editor = _Newtype <<< prop (SProxy :: SProxy "is_editor")
 
 _created_at :: Lens' User DateTime
 _created_at = _Newtype <<< prop (SProxy :: SProxy "created_at")

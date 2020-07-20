@@ -71,6 +71,9 @@ user_tel = "電話番号"
 user_admin :: String
 user_admin = "管理者"
 
+user_editor :: String
+user_editor = "編集者"
+
 
 crop :: String
 crop = "作物"
@@ -89,3 +92,10 @@ pest_list = pest <> "リスト"
 
 pest_label :: String
 pest_label = pest <> "名"
+
+
+admin_page :: String
+admin_page = user_admin <> "ページ"
+
+editor_page :: String
+editor_page = user_editor <> "ページ"

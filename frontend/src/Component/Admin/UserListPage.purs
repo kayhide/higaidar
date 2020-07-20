@@ -122,10 +122,10 @@ render state =
         []
       ]
 
-    renderItem (User { id, code, tel, name, is_admin, created_at }) =
+    renderItem (User { id, code, tel, name, is_admin, is_editor, created_at }) =
       HH.tr_
       [ HH.td_
-        [ renderIsAdmin is_admin ]
+        [ renderRole is_admin is_editor]
       , HH.td_
         [ HH.a
           [ HP.href $ R.path $ R.UsersShow id ]
@@ -145,13 +145,16 @@ render state =
         ]
       ]
 
-    renderIsAdmin =
-      if _
-      then
+    renderRole is_admin is_editor = case is_admin, is_editor of
+      true, _ ->
         HH.span
         [ HP.class_ $ H.ClassName "badge badge-danger" ]
         [ HH.text "admin" ]
-      else
+      _, true ->
+        HH.span
+        [ HP.class_ $ H.ClassName "badge badge-secondary" ]
+        [ HH.text "editor" ]
+      _, _ ->
         HH.span_ []
 
 

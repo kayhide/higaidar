@@ -108,6 +108,7 @@ render state =
       , renderInput "user-name" Ja.user_name User._name
       , renderInput "user-tel" Ja.user_tel User._tel
       , renderCheckbox "user-is_admin" Ja.user_admin User._is_admin
+      , renderCheckbox "user-is_editor" Ja.user_editor User._is_editor
       , renderStatic "user-created_at" Ja.created_at created_at
       , renderStatic "user-updated_at" Ja.updated_at updated_at
       , HH.hr_
