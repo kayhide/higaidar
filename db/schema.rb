@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 20200710112339) do
+ActiveRecord::Schema.define(version: 20200720123114) do
 
   create_table "crops", force: :cascade, options: "ENGINE=InnoDB DEFAULT CHARSET=utf8" do |t|
     t.string "label"
@@ -44,6 +44,7 @@ ActiveRecord::Schema.define(version: 20200710112339) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.boolean "is_admin", default: false, null: false
+    t.boolean "is_editor", default: false, null: false
     t.index ["code"], name: "index_users_on_code", unique: true
   end
 

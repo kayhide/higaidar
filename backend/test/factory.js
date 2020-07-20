@@ -8,6 +8,7 @@ const factory = {
         name: `User ${i}`,
         tel: `03-1234-${8900 + i}`,
         is_admin: false,
+        is_editor: false,
       };
     }
   },

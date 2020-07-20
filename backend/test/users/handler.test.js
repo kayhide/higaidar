@@ -135,7 +135,7 @@ describe('users', () => {
 
         const body = JSON.parse(res.body);
         assert(_.isMatch(body, attrs));
-        assert(_.isMatch(body, { is_admin: false }));
+        assert(_.isMatch(body, { is_admin: false, is_editor: false }));
       }));
     });
 
