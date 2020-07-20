@@ -3,6 +3,7 @@ module Component.Admin.PestListPage where
 import AppPrelude
 
 import Api as Api
+import Api.Client (Client)
 import Api.Crops as Crops
 import Api.Pests as Pests
 import Component.HTML.LoadingIndicator as LoadingIndicator
@@ -40,7 +41,7 @@ type State =
   { items :: Array Pest
   , crops :: Array Crop
   , selectedCrop :: Maybe Crop
-  , client :: Api.Client
+  , client :: Client
   , locale :: Locale
   , busy :: Boolean
   , populating :: String
@@ -54,7 +55,7 @@ _invalids :: forall a b r. Lens { invalids :: a | r } { invalids :: b | r } a b
 _invalids = prop (SProxy :: SProxy "invalids")
 
 type Input =
-  { client :: Api.Client
+  { client :: Client
   , locale :: Locale
   }
 
@@ -198,7 +199,7 @@ handleAction = case _ of
     H.raise $ Failed "Failed to create some pests."
 
 
-creater :: forall m. MonadAff m => Api.Client -> Maybe Crop -> String -> m (Maybe Pest)
+creater :: forall m. MonadAff m => Client -> Maybe Crop -> String -> m (Maybe Pest)
 creater cli crop row = do
   let entity = do
         label <- Array.head $ String.trim <$> String.split (Pattern ",") row

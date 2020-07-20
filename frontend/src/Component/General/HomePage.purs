@@ -3,7 +3,7 @@ module Component.General.HomePage where
 import AppPrelude
 
 import Affjax (URL)
-import Api as Api
+import Api.Client (Client)
 import Api.Crops as Crops
 import Api.My.Photos as Photos
 import Api.Pests as Pests
@@ -40,7 +40,7 @@ data Action
 type State =
   { items :: Array Photo
   , loadingItems :: Array URL
-  , client :: Api.Client
+  , client :: Client
   , locale :: Locale
   , crops :: Array Crop
   , pests :: Array Pest
@@ -49,7 +49,7 @@ type State =
   }
 
 type Input =
-  { client :: Api.Client
+  { client :: Client
   , locale :: Locale
   }
 

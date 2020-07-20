@@ -2,7 +2,7 @@ module Api.My.Photos where
 
 import AppPrelude
 
-import Api (Client)
+import Api.Client (Client)
 import Api as Api
 import Model.Photo (Photo, PhotoId, _id)
 

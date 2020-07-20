@@ -5,7 +5,7 @@ import AppPrelude
 import Affjax (URL)
 import Affjax as Affjax
 import Affjax.RequestBody as RequestBody
-import Api as Api
+import Api.Client (Client)
 import Api.Photos.SignedUrl as PhotosSigneUrl
 import Component.HTML.LoadingIndicator as LoadingIndicator
 import Component.Util as Util
@@ -32,7 +32,7 @@ import Web.HTML.HTMLInputElement as HTMLInputElement
 
 
 type Config =
-  { client :: Api.Client
+  { client :: Client
   }
 
 data Action

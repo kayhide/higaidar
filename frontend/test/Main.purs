@@ -2,7 +2,7 @@ module Test.Main where
 
 import AppPrelude
 
-import Api as Api
+import Api.Client (AuthenticateForm(..), _token, makeClient)
 import Api.Token as Token
 import Effect.Aff (Aff, attempt, runAff_)
 import Effect.Class.Console (logShow)
@@ -22,12 +22,12 @@ main = runAff_ (const $ pure unit) do
 testAuthenticateSuccess :: Aff Unit
 testAuthenticateSuccess = do
   cli_ <- Token.authenticate cli form
-  logShow $ cli_ ^. Api._token
+  logShow $ cli_ ^. _token
   where
     code = "ﾝ001"
     tel = "0123456789"
-    form = Api.AuthenticateForm { code, tel }
-    cli = Api.makeClient apiEndpoint
+    form = AuthenticateForm { code, tel }
+    cli = makeClient apiEndpoint
 
 testAuthenticateFail :: Aff Unit
 testAuthenticateFail = do
@@ -36,5 +36,5 @@ testAuthenticateFail = do
   where
     code = "20"
     tel = "0123456789"
-    form = Api.AuthenticateForm { code, tel }
-    cli = Api.makeClient apiEndpoint
+    form = AuthenticateForm { code, tel }
+    cli = makeClient apiEndpoint

@@ -2,7 +2,7 @@ module Api.Pests where
 
 import AppPrelude
 
-import Api (Client)
+import Api.Client (Client)
 import Api as Api
 import Model.Pest (Pest, PestEntity, PestId, _id)
 

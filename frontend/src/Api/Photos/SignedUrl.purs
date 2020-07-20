@@ -3,7 +3,7 @@ module Api.Photos.SignedUrl where
 import AppPrelude
 
 import Affjax (URL)
-import Api (Client)
+import Api.Client (Client)
 import Api as Api
 import Data.Argonaut (class DecodeJson, encodeJson)
 

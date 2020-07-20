@@ -8,77 +8,20 @@ import Affjax.RequestBody as RequestBody
 import Affjax.RequestHeader (RequestHeader(..))
 import Affjax.ResponseFormat as RequestFormat
 import Affjax.ResponseHeader as ResponseHeader
+import Api.Client (Client(..), AuthenticationToken)
+import Api.Client as Client
 import Data.Argonaut (class DecodeJson, class EncodeJson, Json, decodeJson, encodeJson)
 import Data.Array as Array
 import Data.Generic.Rep (class Generic)
-import Data.Generic.Rep.Show (genericShow)
 import Data.HTTP.Method (Method(..))
-import Data.Lens (Lens', lens)
-import Data.Lens.Iso.Newtype (_Newtype)
-import Data.Lens.Record (prop)
 import Effect.Aff (error, throwError)
 import Foreign.Object (Object)
 import Foreign.Object as Object
 import Global (encodeURI)
-import Model.User (User)
 import Text.Parsing.Parser (runParser)
 import Text.Parsing.Parser.Language as ParserLanguage
 import Text.Parsing.Parser.String as P
 import Text.Parsing.Parser.Token (makeTokenParser)
-
-
-newtype Client
-  = Client
-    { endpoint :: String
-    , user :: Maybe User
-    , token :: Maybe AuthenticationToken
-    }
-
-makeClient :: String -> Client
-makeClient endpoint = Client { endpoint, user: Nothing, token: Nothing }
-
-derive instance newtypeClient :: Newtype Client _
-derive instance genericClient :: Generic Client _
-instance showClient :: Show Client where
-  show = genericShow
-
-_endpoint :: Lens' Client String
-_endpoint = lens (_.endpoint <<< unwrap) (\s a -> wrap $ _{ endpoint = a } $ unwrap s)
-
-_user :: Lens' Client (Maybe User)
-_user = lens (_.user <<< unwrap) (\s a -> wrap $ _{ user = a } $ unwrap s)
-
-_token :: Lens' Client (Maybe AuthenticationToken)
-_token = lens (_.token <<< unwrap) (\s a -> wrap $ _{ token = a } $ unwrap s)
-
-
-type UserCode = String
-type UserTel = String
-type AuthenticationToken = String
-
-newtype AuthenticateForm =
-  AuthenticateForm
-  { code :: UserCode
-  , tel :: UserTel
-  }
-
-_code :: Lens' AuthenticateForm UserCode
-_code = _Newtype <<< prop (SProxy :: SProxy "code")
-
-_tel :: Lens' AuthenticateForm UserTel
-_tel = _Newtype <<< prop (SProxy :: SProxy "tel")
-
-derive instance newtypeAuthenticateForm :: Newtype AuthenticateForm _
-derive instance genericAuthenticateForm :: Generic AuthenticateForm _
-instance showAuthenticateForm :: Show AuthenticateForm where
-  show = genericShow
-derive newtype instance encodeJsonAuthenticateForm :: EncodeJson AuthenticateForm
-
-
-isAuthenticated :: Client -> Boolean
-isAuthenticated = case _ of
-  Client { token: Just _ } -> true
-  _ -> false
 
 
 type Range =
@@ -125,7 +68,7 @@ verifyToken (Client cli) = maybe throw_ pure cli.token
 buildGet :: Client -> String -> Aff (Request Json)
 buildGet cli path = do
   token <- verifyToken cli
-  let url = cli ^. _endpoint <> path
+  let url = cli ^. Client._endpoint <> path
       headers = [ RequestHeader "Authorization" $ "Bearer " <> token ]
   pure $ defaultRequest
     { url = url

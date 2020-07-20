@@ -2,7 +2,7 @@ module Component.Admin.CropListPage where
 
 import AppPrelude
 
-import Api as Api
+import Api.Client (Client)
 import Api.Crops as Crops
 import Component.HTML.LoadingIndicator as LoadingIndicator
 import Component.PopulateUI as PopulateUI
@@ -18,9 +18,9 @@ import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import I18n.Ja as Ja
-import Model.DateTime (Locale)
 import Model.Crop (Crop(..), CropEntity(..), CropId)
 import Model.Crop as Crop
+import Model.DateTime (Locale)
 
 
 data Action
@@ -32,7 +32,7 @@ data Action
 
 type State =
   { items :: Array Crop
-  , client :: Api.Client
+  , client :: Client
   , locale :: Locale
   , busy :: Boolean
   , populating :: String
@@ -46,7 +46,7 @@ _invalids :: forall a b r. Lens { invalids :: a | r } { invalids :: b | r } a b
 _invalids = prop (SProxy :: SProxy "invalids")
 
 type Input =
-  { client :: Api.Client
+  { client :: Client
   , locale :: Locale
   }
 
@@ -161,7 +161,7 @@ handleAction = case _ of
     H.raise $ Failed "Failed to create some crops."
 
 
-creater :: forall m. MonadAff m => Api.Client -> String -> m (Maybe Crop)
+creater :: forall m. MonadAff m => Client -> String -> m (Maybe Crop)
 creater cli row = do
   let entity = do
         label <- Array.head $ String.trim <$> String.split (Pattern ",") row

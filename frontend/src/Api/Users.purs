@@ -2,8 +2,9 @@ module Api.Users where
 
 import AppPrelude
 
-import Api (Client, WithRange)
+import Api (WithRange)
 import Api as Api
+import Api.Client (Client)
 import Data.Array as Array
 import Data.String as String
 import Model.User (User, UserEntity, UserId, _id)

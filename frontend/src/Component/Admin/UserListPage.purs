@@ -2,7 +2,7 @@ module Component.Admin.UserListPage where
 
 import AppPrelude
 
-import Api as Api
+import Api.Client (Client)
 import Api.Users as Users
 import Component.Admin.Route as R
 import Component.HTML.LoadingIndicator as LoadingIndicator
@@ -12,7 +12,7 @@ import Component.Util as Util
 import Data.Array ((!!))
 import Data.Array as Array
 import Data.Lens (view)
-import Data.String (Pattern (..))
+import Data.String (Pattern(..))
 import Data.String as String
 import Halogen as H
 import Halogen.HTML as HH
@@ -20,7 +20,7 @@ import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import I18n.Ja as Ja
 import Model.DateTime (Locale)
-import Model.User (User (..), UserEntity (..), UserId)
+import Model.User (User(..), UserEntity(..), UserId)
 import Model.User as User
 
 
@@ -33,14 +33,14 @@ data Action
 
 type State =
   { items :: Array User
-  , client :: Api.Client
+  , client :: Client
   , locale :: Locale
   , busy :: Boolean
   , pager :: PagerUI.Pager
   }
 
 type Input =
-  { client :: Api.Client
+  { client :: Client
   , locale :: Locale
   }
 
@@ -203,7 +203,7 @@ handleAction = case _ of
     H.raise $ Failed "Failed to create some users."
 
 
-creater :: forall m. MonadAff m => Api.Client -> String -> m (Maybe User)
+creater :: forall m. MonadAff m => Client -> String -> m (Maybe User)
 creater cli row =
   maybe (pure Nothing) (map hush <<< H.liftAff <<< attempt <<< Users.create cli) entity
 

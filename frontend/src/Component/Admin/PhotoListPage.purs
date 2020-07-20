@@ -3,6 +3,7 @@ module Component.Admin.PhotoListPage where
 import AppPrelude
 
 import Api as Api
+import Api.Client (Client)
 import Api.Photos as Photos
 import Api.Users as Users
 import Component.HTML.LoadingIndicator as LoadingIndicator
@@ -24,7 +25,7 @@ import Halogen.HTML.Properties as HP
 import Halogen.Query.HalogenM as HM
 import I18n.Ja as Ja
 import Model.DateTime (Locale)
-import Model.Photo (Photo (..), PhotoId)
+import Model.Photo (Photo(..), PhotoId)
 import Model.Photo as Photo
 import Model.User (User(..), UserId)
 import Model.User as User
@@ -44,7 +45,7 @@ data Action
 type State =
   { items :: Array Photo
   , users :: Map UserId User
-  , client :: Api.Client
+  , client :: Client
   , locale :: Locale
   , deleting :: Boolean
   , busy :: Boolean
@@ -54,7 +55,7 @@ type State =
   }
 
 type Input =
-  { client :: Api.Client
+  { client :: Client
   , locale :: Locale
   }
 

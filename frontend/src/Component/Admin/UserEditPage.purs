@@ -2,7 +2,7 @@ module Component.Admin.UserEditPage where
 
 import AppPrelude
 
-import Api as Api
+import Api.Client (Client)
 import Api.Users as Users
 import Component.HTML.Checkbox as Checkbox
 import Component.HTML.LoadingIndicator as LoadingIndicator
@@ -34,7 +34,7 @@ type State =
   { userId :: Int
   , user :: Maybe User
   , editing :: Maybe User
-  , client :: Api.Client
+  , client :: Client
   , locale :: Locale
   , busy :: Boolean
   }
@@ -45,7 +45,7 @@ _editing = prop (SProxy :: SProxy "editing")
 
 type Input =
   { userId :: Int
-  , client :: Api.Client
+  , client :: Client
   , locale :: Locale
   }
 

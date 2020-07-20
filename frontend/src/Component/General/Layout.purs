@@ -2,7 +2,7 @@ module Component.General.Layout where
 
 import AppPrelude
 
-import Api as Api
+import Api.Client (Client(..), isAuthenticated, makeClient)
 import AppConfig (AppConfig)
 import Component.General.HomePage as HomePage
 import Component.General.Route as R
@@ -26,7 +26,7 @@ data Action
 
 type State =
   { appConfig :: AppConfig
-  , apiClient :: Api.Client
+  , apiClient :: Client
   , locale :: Locale
   , location :: R.Location
   }
@@ -62,7 +62,7 @@ ui =
   where
     initialState appConfig@({ apiEndpoint }) =
       { appConfig
-      , apiClient: Api.makeClient apiEndpoint
+      , apiClient: makeClient apiEndpoint
       , locale: Locale (Just "GMT") (Minutes 0.0)
       , location: R.Home
       }
@@ -97,14 +97,13 @@ render state =
   where
     client = state.apiClient
     locale = state.locale
-    isAuthenticated = Api.isAuthenticated client
 
     updateButtonClass =
       "btn btn-outline-primary mb-2"
-      <> if isAuthenticated then "" else " disabled"
+      <> bool " disabled" "" (isAuthenticated client)
 
     renderAdminMenu = case client of
-      Api.Client { user: Just (User { is_admin: true }) } ->
+      Client { user: Just (User { is_admin: true }) } ->
         HH.a
         [ HP.class_ $ H.ClassName "badge badge-danger ml-auto mr-2"
         , HP.href "/admin/#/"
@@ -116,7 +115,7 @@ render state =
         []
 
     renderUserName = case client of
-      Api.Client { user: Just (User { name }) } ->
+      Client { user: Just (User { name }) } ->
         HH.span
         [ HP.class_ $ H.ClassName "navbar-text mr-2" ]
         [ HH.text $ name ]
@@ -126,7 +125,7 @@ render state =
     renderLoginButton =
       HH.a
       [ HP.class_ $ H.ClassName $ "btn btn-sm "
-        <> if isAuthenticated then "btn-secondary" else "btn-outline-secondary"
+        <> bool "btn-outline-secondary" "btn-secondary" (isAuthenticated client)
       , HP.href $ R.path R.Login
       ]
       [
@@ -144,7 +143,7 @@ render state =
         $ HH.slot (SProxy :: _ "home") unit HomePage.ui { client, locale } $ Just <<< HandleHome
 
     withAuthentication html =
-      if Api.isAuthenticated client
+      if isAuthenticated client
       then html
       else HH.slot (SProxy :: _ "login") unit LoginUI.ui client $ Just <<< HandleLogin
 

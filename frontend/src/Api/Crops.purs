@@ -2,7 +2,7 @@ module Api.Crops where
 
 import AppPrelude
 
-import Api (Client)
+import Api.Client (Client)
 import Api as Api
 import Model.Crop (Crop, CropEntity, CropId, _id)
 
