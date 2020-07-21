@@ -121,3 +121,19 @@ $ yarn deploy
 Configure domain routing for the frontend.
 
 If using Route53, creating an alias to the corresponding S3 bucket is fine.
+
+## Deploy update
+
+- Migrate database
+- Deploy backend
+- Deploy frontend
+
+```sh
+$ ON_REMOTE=1 rake db:migrate
+$ (cd backend && yarn deploy)
+$ (cd frontend && yarn deploy)
+```
+
+By default, these commands target on `dev` stage.
+
+When deploying to `prod`, set `STAGE=prod` and run the same commands.
