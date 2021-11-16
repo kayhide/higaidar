@@ -1,7 +1,7 @@
 {
   "private": true,
   "dependencies": {
-    "aws-sdk": "^2.158.0",
+    "aws-sdk": "^2.814.0",
     "co": "^4.6.0",
     "gm": "^1.23.0",
     "jsonwebtoken": "^8.1.0",
