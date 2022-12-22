@@ -4,7 +4,7 @@
     "aws-sdk": "^2.158.0",
     "co": "^4.6.0",
     "gm": "^1.23.0",
-    "jsonwebtoken": "^8.1.0",
+    "jsonwebtoken": "^9.0.0",
     "lodash": "^4.17.19",
     "mime-types": "^2.1.17",
     "mysql2": "^2.1.0",
